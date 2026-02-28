@@ -14,7 +14,9 @@
     "mobile:start": "npm --prefix mobile run start",
     "mobile:test": "npm --prefix mobile run test",
     "mobile:verify": "npm --prefix mobile run verify",
-    "test:all": "npm test && npm run mobile:test"
+    "test:all": "npm test && npm run mobile:test",
+    "ios:run": "npm --prefix mobile run ios:run",
+    "e2e:maestro": "maestro test mobile/.maestro"
   },
   "keywords": [
     "physiotherapy",
