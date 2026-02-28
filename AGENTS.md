@@ -15,9 +15,11 @@
 2. Run mobile tests: `npm run mobile:test`
 3. Run full mobile preflight before phone testing: `npm run mobile:verify`
 4. Run both root + mobile tests together when needed: `npm run test:all`
+5. Before iOS simulator tests, verify tooling: `xcodebuild -version && xcrun simctl list devices && pod --version`
 
 ## Network Access Policy
 
 1. Never use network access unless the user explicitly approves it in the current turn.
-2. Before any networked command (for example `npm install`, `npx`, `git push`, `git pull`, `curl`, `brew`), ask for permission first.
-3. Request one-time approval only for networked commands; do not request or rely on persistent approval rules.
+2. For any networked or escalated command (for example `npm install`, `npx`, `git push`, `git pull`, `curl`, `brew`), use Codex's built-in permission request flow directly.
+3. Do not pause to ask the user for manual yes/no in chat before requesting tool permission.
+4. Request one-time approval only for networked commands; do not request or rely on persistent approval rules.
