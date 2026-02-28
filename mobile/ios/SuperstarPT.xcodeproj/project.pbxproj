@@ -9,9 +9,11 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		333B055791AAF66239E9AA34 /* libPods-SuperstarPT.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E4776E44FC9DBE8FC70FC5B8 /* libPods-SuperstarPT.a */; };
+		3395CCDB79BAC7A6EFE47663 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DFEC99F521A1F7345FABC06 /* Foundation.framework */; };
 		37CA9F5B27A038219479A557 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AD67849B65AF927BF3DECE18 /* PrivacyInfo.xcprivacy */; };
 		38BDFB4287744BF65F00D8CC /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DFEC99F521A1F7345FABC06 /* Foundation.framework */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		575EAD6C76C8ADB1BDB2EE73 /* SuperstarPTUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CADCC3AD026C08A04F13272F /* SuperstarPTUITests.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		C899652D6B5E7F7B4EFE42C7 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E942172C71888785A9AF7388 /* ExpoModulesProvider.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
@@ -19,6 +21,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		31EF76F538772D0C20690971 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
+			remoteInfo = SuperstarPT;
+		};
 		3B0CA4CAA0BAC96F74DFF0D2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
@@ -38,6 +47,7 @@
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SuperstarPT/SplashScreen.storyboard; sourceTree = "<group>"; };
 		AD67849B65AF927BF3DECE18 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = SuperstarPT/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		CADCC3AD026C08A04F13272F /* SuperstarPTUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SuperstarPTUITests.swift; sourceTree = "<group>"; };
 		D78B86139230D98660079395 /* Pods-SuperstarPT.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SuperstarPT.debug.xcconfig"; path = "Target Support Files/Pods-SuperstarPT/Pods-SuperstarPT.debug.xcconfig"; sourceTree = "<group>"; };
 		DEABC6600BAD453A13EDC30F /* Pods-SuperstarPT.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SuperstarPT.release.xcconfig"; path = "Target Support Files/Pods-SuperstarPT/Pods-SuperstarPT.release.xcconfig"; sourceTree = "<group>"; };
 		E4776E44FC9DBE8FC70FC5B8 /* libPods-SuperstarPT.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SuperstarPT.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -45,6 +55,7 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SuperstarPT/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* SuperstarPT-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "SuperstarPT-Bridging-Header.h"; path = "SuperstarPT/SuperstarPT-Bridging-Header.h"; sourceTree = "<group>"; };
+		FDB72F702BBA5505EC30062D /* SuperstarPTUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuperstarPTUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +64,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				333B055791AAF66239E9AA34 /* libPods-SuperstarPT.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		95FBB9A091515D3D367CB50E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3395CCDB79BAC7A6EFE47663 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +98,15 @@
 				AD67849B65AF927BF3DECE18 /* PrivacyInfo.xcprivacy */,
 			);
 			name = SuperstarPT;
+			sourceTree = "<group>";
+		};
+		1D72F9A65F7016A89518CCE5 /* SuperstarPTUITests */ = {
+			isa = PBXGroup;
+			children = (
+				CADCC3AD026C08A04F13272F /* SuperstarPTUITests.swift */,
+			);
+			name = SuperstarPTUITests;
+			path = SuperstarPTUITests;
 			sourceTree = "<group>";
 		};
 		2A951A6C66172E3D4AB91A1A /* iOS */ = {
@@ -134,6 +162,7 @@
 				3A3FA5B366FDE6B41288A623 /* Pods */,
 				9A902DD5127401AEF7014811 /* ExpoModulesProviders */,
 				8C8B90AB134017FAEDC7C675 /* SuperstarPTTests */,
+				1D72F9A65F7016A89518CCE5 /* SuperstarPTUITests */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -145,6 +174,7 @@
 			children = (
 				13B07F961A680F5B00A75B9A /* SuperstarPT.app */,
 				79A69F377848F027FEA26897 /* SuperstarPTTests.xctest */,
+				FDB72F702BBA5505EC30062D /* SuperstarPTUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -199,6 +229,24 @@
 			productReference = 13B07F961A680F5B00A75B9A /* SuperstarPT.app */;
 			productType = "com.apple.product-type.application";
 		};
+		78FA9EBAEED8A5030F9FE3E1 /* SuperstarPTUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9D19BAEA4D59D6AED0F06B52 /* Build configuration list for PBXNativeTarget "SuperstarPTUITests" */;
+			buildPhases = (
+				05F05C6215E97D93DF078E94 /* Sources */,
+				95FBB9A091515D3D367CB50E /* Frameworks */,
+				C5323386AB09137CC30442B7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BC125AACAC8055C5BE5EAE47 /* PBXTargetDependency */,
+			);
+			name = SuperstarPTUITests;
+			productName = SuperstarPTUITests;
+			productReference = FDB72F702BBA5505EC30062D /* SuperstarPTUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		D71816F5B32893F52975CEA3 /* SuperstarPTTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AFB0D2B46F3A1F06AED42267 /* Build configuration list for PBXNativeTarget "SuperstarPTTests" */;
@@ -228,6 +276,9 @@
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
 					};
+					78FA9EBAEED8A5030F9FE3E1 = {
+						TestTargetID = 13B07F861A680F5B00A75B9A;
+					};
 				};
 			};
 			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "SuperstarPT" */;
@@ -245,6 +296,7 @@
 			targets = (
 				13B07F861A680F5B00A75B9A /* SuperstarPT */,
 				D71816F5B32893F52975CEA3 /* SuperstarPTTests */,
+				78FA9EBAEED8A5030F9FE3E1 /* SuperstarPTUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -262,6 +314,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		24265482FCF8F8D9E61A8C0E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C5323386AB09137CC30442B7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -385,6 +444,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		05F05C6215E97D93DF078E94 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				575EAD6C76C8ADB1BDB2EE73 /* SuperstarPTUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0A2AD79A61F5B1E2F1E946B4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -405,6 +472,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		BC125AACAC8055C5BE5EAE47 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = SuperstarPT;
+			target = 13B07F861A680F5B00A75B9A /* SuperstarPT */;
+			targetProxy = 31EF76F538772D0C20690971 /* PBXContainerItemProxy */;
+		};
 		F2055D50AF999A90008C0AB1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = SuperstarPT;
@@ -414,6 +487,26 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		047826FB2FC4B5AE86A5A214 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.omarelkhatib.superstarptUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SuperstarPT;
+				WRAPPER_EXTENSION = xctest;
+			};
+			name = Debug;
+		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = D78B86139230D98660079395 /* Pods-SuperstarPT.debug.xcconfig */;
@@ -477,6 +570,27 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		32B9A20CA42F90E6B540DA16 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.omarelkhatib.superstarptUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SuperstarPT;
+				VALIDATE_PRODUCT = YES;
+				WRAPPER_EXTENSION = xctest;
 			};
 			name = Release;
 		};
@@ -652,6 +766,15 @@
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9D19BAEA4D59D6AED0F06B52 /* Build configuration list for PBXNativeTarget "SuperstarPTUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				32B9A20CA42F90E6B540DA16 /* Release */,
+				047826FB2FC4B5AE86A5A214 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

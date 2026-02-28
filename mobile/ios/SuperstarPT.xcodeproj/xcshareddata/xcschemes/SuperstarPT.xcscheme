@@ -5,12 +5,18 @@
       <BuildActionEntry buildForTesting='YES' buildForRunning='YES' buildForProfiling='YES' buildForArchiving='YES' buildForAnalyzing='YES'>
         <BuildableReference BuildableIdentifier='primary' BlueprintIdentifier='13B07F861A680F5B00A75B9A' BuildableName='SuperstarPT.app' BlueprintName='SuperstarPT' ReferencedContainer='container:SuperstarPT.xcodeproj'> </BuildableReference>
       </BuildActionEntry>
+      <BuildActionEntry buildForTesting='YES' buildForRunning='NO' buildForProfiling='NO' buildForArchiving='NO' buildForAnalyzing='NO'>
+        <BuildableReference BuildableIdentifier='primary' BlueprintIdentifier='78FA9EBAEED8A5030F9FE3E1' BuildableName='SuperstarPTUITests.xctest' BlueprintName='SuperstarPTUITests' ReferencedContainer='container:SuperstarPT.xcodeproj'/>
+      </BuildActionEntry>
     </BuildActionEntries>
   </BuildAction>
   <TestAction buildConfiguration='Debug' selectedDebuggerIdentifier='Xcode.DebuggerFoundation.Debugger.LLDB' selectedLauncherIdentifier='Xcode.DebuggerFoundation.Launcher.LLDB' shouldUseLaunchSchemeArgsEnv='YES'>
     <Testables>
       <TestableReference skipped='NO'>
         <BuildableReference BuildableIdentifier='primary' BlueprintIdentifier='D71816F5B32893F52975CEA3' BuildableName='SuperstarPTTests.xctest' BlueprintName='SuperstarPTTests' ReferencedContainer='container:SuperstarPT.xcodeproj'/>
+      </TestableReference>
+      <TestableReference skipped='NO'>
+        <BuildableReference BuildableIdentifier='primary' BlueprintIdentifier='78FA9EBAEED8A5030F9FE3E1' BuildableName='SuperstarPTUITests.xctest' BlueprintName='SuperstarPTUITests' ReferencedContainer='container:SuperstarPT.xcodeproj'/>
       </TestableReference>
     </Testables>
   </TestAction>

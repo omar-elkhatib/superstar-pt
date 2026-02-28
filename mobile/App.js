@@ -33,13 +33,16 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Superstar PT</Text>
+      <ScrollView testID="main-scroll" contentContainerStyle={styles.container}>
+        <Text testID="screen-home-title" style={styles.title}>
+          Superstar PT
+        </Text>
         <Text style={styles.subtitle}>Adaptive daily training check-in</Text>
 
         <View style={styles.card}>
           <Text style={styles.label}>Current pain (0-10)</Text>
           <TextInput
+            testID="input-current-pain"
             value={currentPain}
             onChangeText={setCurrentPain}
             keyboardType="number-pad"
@@ -48,6 +51,7 @@ export default function App() {
 
           <Text style={styles.label}>Prior pain (0-10)</Text>
           <TextInput
+            testID="input-prior-pain"
             value={priorPain}
             onChangeText={setPriorPain}
             keyboardType="number-pad"
@@ -60,6 +64,7 @@ export default function App() {
               <Pressable
                 key={option}
                 onPress={() => setReadiness(option)}
+                testID={`btn-readiness-${option}`}
                 style={[
                   styles.pill,
                   readiness === option ? styles.pillActive : styles.pillInactive
@@ -82,6 +87,7 @@ export default function App() {
           <View style={styles.switchRow}>
             <Text style={styles.label}>Symptoms worsened in 24h</Text>
             <Switch
+              testID="switch-symptom-worsened"
               value={symptomWorsenedIn24h}
               onValueChange={setSymptomWorsenedIn24h}
             />
@@ -90,7 +96,9 @@ export default function App() {
 
         <View style={styles.resultCard}>
           <Text style={styles.resultTitle}>Today&apos;s recommendation</Text>
-          <Text style={styles.resultItem}>Action: {recommendation.action}</Text>
+          <Text testID="result-action-label" style={styles.resultItem}>
+            Action: {recommendation.action}
+          </Text>
           <Text style={styles.resultItem}>
             Intensity: x{recommendation.intensityMultiplier}
           </Text>

@@ -36,6 +36,23 @@ This runs:
 
 If this command passes, your app is in a much safer state before scanning on a device.
 
+### iOS Simulator UI feedback loop (Xcode)
+
+1. Start Metro (required for interactive React Native UI in simulator):
+```bash
+npm run mobile:start
+```
+2. In another terminal, launch simulator app for manual interaction:
+```bash
+npm run ios:run
+```
+3. Run automated UI interactions + screenshots:
+```bash
+npm run ios:test:ui
+```
+4. Open screenshot artifacts from the generated bundle:
+`mobile/.derived-data/UIFeedback-release-<timestamp>.xcresult`
+
 ### iOS Simulator E2E with Maestro
 
 Prerequisites:
@@ -134,6 +151,7 @@ After build completes, install using the provided link/TestFlight.
 - `npm run mobile:verify`: run mobile tests + Expo config + iOS bundle export
 - `npm run test:all`: run root tests and mobile tests together
 - `npm run ios:run`: build and launch app in iOS simulator
+- `npm run ios:test:ui`: run XCUITest UI flow and store screenshots in `.xcresult`
 - `npm run e2e:maestro`: run Maestro E2E flows in `mobile/.maestro`
 
 ## Initial architecture
