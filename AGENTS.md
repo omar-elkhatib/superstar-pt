@@ -9,6 +9,13 @@
 5. Iterate on implementation and re-run tests until all relevant tests pass.
 6. Do not consider work complete until tests pass and business-value expectations are covered by tests.
 
+## Repo Testing Commands
+
+1. Run root logic tests: `npm test`
+2. Run mobile tests: `npm run mobile:test`
+3. Run full mobile preflight before phone testing: `npm run mobile:verify`
+4. Run both root + mobile tests together when needed: `npm run test:all`
+
 ## Network Access Policy
 
 1. Never use network access unless the user explicitly approves it in the current turn.
