@@ -46,12 +46,20 @@ npm run mobile:start
 ```bash
 npm run ios:run
 ```
+Expected success signal: terminal prints `Verified app launch: <bundle-id> (pid <number>)`.
 3. Run automated UI interactions + screenshots:
 ```bash
 npm run ios:test:ui
 ```
 4. Open screenshot artifacts from the generated bundle:
 `mobile/.derived-data/UIFeedback-release-<timestamp>.xcresult`
+
+Note: `[libapp_launch_measurement.dylib] Failed to send CA Event...` lines are simulator telemetry warnings and are non-fatal if the app continues to bundle and render.
+
+To print the latest artifact locations quickly:
+```bash
+npm run ios:test:artifacts
+```
 
 ### iOS Simulator E2E with Maestro
 
@@ -164,15 +172,3 @@ After build completes, install using the provided link/TestFlight.
 - `mobile/test/adaptivePlan.test.mjs`: mobile logic test
 - `mobile/test/projectConfig.test.mjs`: mobile Expo compatibility test
 - `.github/workflows/ci.yml`: CI running lint + tests
-
-## Create GitHub remote
-
-After creating an empty GitHub repository, run:
-
-```bash
-git remote add origin <your-repo-url>
-git branch -M main
-git add .
-git commit -m "Initial scaffold: adaptive coach app"
-git push -u origin main
-```

@@ -15,9 +15,11 @@
     "mobile:test": "npm --prefix mobile run test",
     "mobile:verify": "npm --prefix mobile run verify",
     "test:all": "npm test && npm run mobile:test",
-    "ios:run": "npm --prefix mobile run ios:run",
+    "ios:run": "node scripts/ios-run.mjs",
+    "ios:run:expo": "npm --prefix mobile run ios:run:expo",
     "ios:test:ui": "cd mobile/ios && xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -configuration Release -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.derived-data -resultBundlePath ../.derived-data/UIFeedback-release-$(date +%Y%m%d-%H%M%S).xcresult -only-testing:SuperstarPTUITests",
     "ios:test:ui:extract": "node scripts/export-ui-screenshots.mjs",
+    "ios:test:artifacts": "node scripts/ios-test-artifacts.mjs",
     "e2e:maestro": "maestro test mobile/.maestro"
   },
   "keywords": [

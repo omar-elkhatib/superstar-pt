@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { findLatestXcresult, planOutputFiles } from "../scripts/export-ui-screenshots-lib.mjs";
+import {
+  findLatestScreenshotsDir,
+  findLatestXcresult,
+  planOutputFiles
+} from "../scripts/export-ui-screenshots-lib.mjs";
 
 test("planOutputFiles builds stable png names from xcresult manifest", () => {
   const manifest = [
@@ -49,6 +53,27 @@ test("findLatestXcresult returns most recently modified UIFeedback release bundl
     fs.utimesSync(newer, now / 1000, now / 1000);
 
     const latest = findLatestXcresult(root);
+    assert.equal(latest, newer);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("findLatestScreenshotsDir returns most recently modified screenshot directory", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "screenshots-test-"));
+  try {
+    const screenshotsRoot = path.join(root, "ui-screenshots");
+    fs.mkdirSync(screenshotsRoot);
+    const older = path.join(screenshotsRoot, "UIFeedback-release-older");
+    const newer = path.join(screenshotsRoot, "UIFeedback-release-newer");
+    fs.mkdirSync(older);
+    fs.mkdirSync(newer);
+
+    const now = Date.now();
+    fs.utimesSync(older, now / 1000 - 10, now / 1000 - 10);
+    fs.utimesSync(newer, now / 1000, now / 1000);
+
+    const latest = findLatestScreenshotsDir(root);
     assert.equal(latest, newer);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

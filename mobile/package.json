@@ -6,10 +6,11 @@
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
-    "ios:run": "expo run:ios",
+    "ios:run": "npm run ios:run:expo",
+    "ios:run:expo": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
-    "test:logic": "node --test test/adaptivePlan.test.mjs",
+    "test:logic": "node --test test/*.test.mjs",
     "test:config": "node --test test/projectConfig.test.mjs",
     "test": "npm run test:logic && npm run test:config",
     "doctor": "expo config --json > /dev/null",

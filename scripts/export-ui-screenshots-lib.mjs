@@ -22,6 +22,22 @@ export function findLatestXcresult(derivedDataDir) {
   return entries[0].fullPath;
 }
 
+export function findLatestScreenshotsDir(derivedDataDir) {
+  const root = path.join(derivedDataDir, "ui-screenshots");
+  if (!fs.existsSync(root)) {
+    return null;
+  }
+
+  const entries = fs
+    .readdirSync(root)
+    .map((name) => path.join(root, name))
+    .filter((fullPath) => fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory())
+    .map((fullPath) => ({ fullPath, mtimeMs: fs.statSync(fullPath).mtimeMs }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  return entries[0]?.fullPath || null;
+}
+
 export function planOutputFiles(manifest) {
   const planned = [];
 

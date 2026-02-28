@@ -19,6 +19,8 @@
 6. Run iOS simulator unit-test validation to completion: `cd mobile/ios && xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.derived-data -only-testing:SuperstarPTTests`
 7. Run automated iOS UI interaction + screenshots: `npm run ios:test:ui` (Release simulator run, no Metro required)
 8. Export latest UI test screenshots to PNG files: `npm run ios:test:ui:extract` (writes to `mobile/.derived-data/ui-screenshots/<xcresult-name>/`)
+9. Run interactive simulator app launch validation: `npm run ios:run` and confirm it reports `Verified app launch: <bundle-id> (pid <number>)`.
+10. Print latest artifact locations for quick access: `npm run ios:test:artifacts`
 
 ## Network Access Policy
 
