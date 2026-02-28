@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Superstar PT",
+    "slug": "superstar-pt",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#f1f7f3"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.omarelkhatib.superstarpt"
+    }
+  }
+}
+

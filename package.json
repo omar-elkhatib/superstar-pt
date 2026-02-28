@@ -7,9 +7,14 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "test:watch": "node --test --watch",
-    "lint": "node --check src/*.js test/*.js"
+    "lint": "node --check src/*.js test/*.js mobile/src/*.mjs mobile/test/*.mjs",
+    "mobile:install": "NPM_CONFIG_CACHE=.npm-cache npm --prefix mobile install --include=dev",
+    "mobile:start": "npm --prefix mobile run start",
+    "mobile:test": "npm --prefix mobile run test",
+    "mobile:verify": "npm --prefix mobile run verify",
+    "test:all": "npm test && npm run mobile:test"
   },
   "keywords": [
     "physiotherapy",
