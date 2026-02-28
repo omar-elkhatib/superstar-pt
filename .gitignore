@@ -3,3 +3,6 @@ node_modules/
 coverage/
 .env
 .npm-cache/
+mobile/.derived-data/
+mobile/.xcode-home/
+mobile/.maestro/
