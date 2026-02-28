@@ -7,7 +7,7 @@ on:
     branches: ["main", "master"]
 
 jobs:
-  test:
+  backend-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,3 +28,26 @@ jobs:
       - name: Test
         run: npm test
 
+  mobile-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install mobile dependencies
+        run: npm run mobile:install
+
+      - name: Mobile tests
+        run: npm run mobile:test
