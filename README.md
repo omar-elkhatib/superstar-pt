@@ -36,6 +36,31 @@ This runs:
 
 If this command passes, your app is in a much safer state before scanning on a device.
 
+### iOS Simulator E2E with Maestro
+
+Prerequisites:
+
+1. Xcode selected as active developer directory:
+```bash
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+```
+2. iOS simulator runtime available (`xcrun simctl list devices` should work).
+3. Maestro CLI installed:
+```bash
+curl -Ls "https://get.maestro.mobile.dev" | bash
+```
+
+Run flow:
+
+```bash
+npm run ios:run
+npm run e2e:maestro
+```
+
+Current flow file:
+
+- `mobile/.maestro/smoke.yaml`
+
 ### Build a downloadable iOS app (TestFlight/internal)
 
 From the `mobile/` directory:
@@ -108,6 +133,8 @@ After build completes, install using the provided link/TestFlight.
 - `npm run mobile:test`: run mobile logic + config tests
 - `npm run mobile:verify`: run mobile tests + Expo config + iOS bundle export
 - `npm run test:all`: run root tests and mobile tests together
+- `npm run ios:run`: build and launch app in iOS simulator
+- `npm run e2e:maestro`: run Maestro E2E flows in `mobile/.maestro`
 
 ## Initial architecture
 

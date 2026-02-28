@@ -16,6 +16,7 @@
 3. Run full mobile preflight before phone testing: `npm run mobile:verify`
 4. Run both root + mobile tests together when needed: `npm run test:all`
 5. Before iOS simulator tests, verify tooling: `xcodebuild -version && xcrun simctl list devices && pod --version`
+6. Run iOS simulator validation to completion: `cd mobile/ios && xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.derived-data`
 
 ## Network Access Policy
 
