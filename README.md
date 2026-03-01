@@ -46,6 +46,18 @@ sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 ```
 2. iOS simulator runtime available (`xcrun simctl list devices` should work).
 3. Java 17+ available (`java -version`).
+   If your shell cannot find Java 17 by default, add this once to `~/.zshrc` or `~/.bashrc`:
+```bash
+# Maestro/Android tooling requires Java 17 on PATH
+if [ -d "/opt/homebrew/opt/openjdk@17/bin" ]; then
+  export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
+elif [ -d "/usr/local/opt/openjdk@17/bin" ]; then
+  export PATH="/usr/local/opt/openjdk@17/bin:$PATH"
+fi
+
+export JAVA_HOME="$(/usr/libexec/java_home -v 17 2>/dev/null || true)"
+```
+   Then restart your shell (or run `source ~/.zshrc` / `source ~/.bashrc`) and re-check with `java -version`.
 4. Maestro CLI installed:
 ```bash
 curl -Ls "https://get.maestro.mobile.dev" | bash
