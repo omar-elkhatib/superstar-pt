@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Worktree Lifecycle"
+  short_description: "Create, list, and clean up Git worktrees safely"
+  default_prompt: "Use $git-worktree-lifecycle to set up a new worktree branch and clean it up after merge."
