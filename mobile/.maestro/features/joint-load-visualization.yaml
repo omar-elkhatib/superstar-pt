@@ -1,15 +1,7 @@
 appId: com.omarelkhatib.superstarpt
 ---
-- clearState
-- launchApp
-- assertVisible:
-    id: screen-home-title
-- tapOn:
-    id: btn-view-load-map
-- assertVisible:
-    id: btn-add-session
-- tapOn:
-    id: btn-add-session
+- runFlow: ../fixtures/session-start.yaml
+- runFlow: ../fixtures/load-map-add-session.yaml
 - tapOn:
     id: btn-view-visualization
 - assertVisible:

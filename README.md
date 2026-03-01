@@ -58,7 +58,8 @@ npm run ios:run
 npm run ios:maestro:test
 ```
 5. Review generated screenshots:
-- `mobile/.derived-data/maestro/artifacts/screenshots`
+- `mobile/.derived-data/maestro/core/artifacts/screenshots`
+- `mobile/.derived-data/maestro/features/artifacts/screenshots`
 
 If the simulator shows `No script URL provided`, start Metro and relaunch:
 ```bash
@@ -73,6 +74,13 @@ Use one reusable feature runner that always does:
 1. `ios:maestro:prepare`
 2. Run one Maestro feature flow
 3. `ios:maestro:teardown` (always, even on failure)
+
+For full E2E (`npm run e2e:maestro`), setup/build happens once and the suite runs all flows in one pass via `mobile/.maestro/config.yaml`:
+
+1. `adaptive-checkin-load-map.yaml`
+2. `features/**/*.yaml`
+
+This avoids rebuilding/rebooting simulator per feature flow.
 
 Run the joint load visualization feature test:
 
@@ -102,6 +110,7 @@ For new feature UI flows, prefer:
 1. Dedicated view/screen for the feature being tested
 2. Stable `testID` selectors instead of text/position selectors
 3. Flow assertions scoped to that feature view only
+4. Shared Maestro fixtures with `runFlow` (for example `fixtures/session-start.yaml`)
 
 ### iOS Simulator E2E with Maestro
 
@@ -142,6 +151,8 @@ Current flow file:
 
 - `mobile/.maestro/adaptive-checkin-load-map.yaml`
 - `mobile/.maestro/features/joint-load-visualization.yaml`
+- `mobile/.maestro/fixtures/session-start.yaml`
+- `mobile/.maestro/fixtures/load-map-add-session.yaml`
 
 ### Build a downloadable iOS app (TestFlight/internal)
 
@@ -217,7 +228,7 @@ After build completes, install using the provided link/TestFlight.
 - `npm run test:all`: run root tests and mobile tests together
 - `npm run ios:run`: build and launch app in iOS simulator
 - `npm run ios:maestro:prepare`: install pods, build Release simulator app, install + launch app
-- `npm run ios:maestro:test`: run Maestro flows and write artifacts to `mobile/.derived-data/maestro`
+- `npm run ios:maestro:test`: run Maestro `core` + `features` suites and write artifacts to `mobile/.derived-data/maestro/{core,features}`
 - `npm run ios:maestro:test:feature`: reusable feature runner (`prepare -> feature flow -> teardown`)
 - `npm run ios:maestro:test:joint-load`: joint-load visualization feature UI test
 - `npm run ios:maestro:teardown`: terminate app + shutdown simulator + close Simulator app

@@ -1,0 +1,6 @@
+appId: com.omarelkhatib.superstarpt
+---
+- clearState
+- launchApp
+- assertVisible:
+    id: screen-home-title
