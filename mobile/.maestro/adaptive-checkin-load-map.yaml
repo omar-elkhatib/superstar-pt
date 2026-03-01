@@ -27,10 +27,10 @@ appId: com.omarelkhatib.superstarpt
     id: btn-add-session
 - scrollUntilVisible:
     element:
-      id: joint-cell-ankle
+      id: btn-toggle-joint-series
     direction: DOWN
 - assertVisible:
-    id: joint-cell-ankle
+    id: chart-shared-axis
 - scrollUntilVisible:
     element:
       id: btn-toggle-history

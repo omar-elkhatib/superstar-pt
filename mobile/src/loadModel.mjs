@@ -33,6 +33,48 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(value, max));
 }
 
+function toLocalDayKey(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function localMidnightFromDayKey(dayKey) {
+  const [year, month, day] = dayKey.split("-").map((value) => Number(value));
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  return new Date(year, month - 1, day);
+}
+
+function formatDayKeyFromDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function createZeroJointMap() {
+  const map = {};
+  for (const jointId of JOINT_IDS) {
+    map[jointId] = 0;
+  }
+  return map;
+}
+
+function roundJointMap(jointMap) {
+  const next = {};
+  for (const jointId of JOINT_IDS) {
+    next[jointId] = Number((jointMap[jointId] || 0).toFixed(3));
+  }
+  return next;
+}
+
 export function createDefaultToleranceState() {
   const factors = {};
   const lastUpdatedIso = {};
@@ -57,6 +99,206 @@ export function computeEntryJointLoad(entry, template) {
   }
 
   return { sessionLoad, byJoint };
+}
+
+export function buildDailyLoadSeries({ entries, templates, asOfIso }) {
+  const asOfTime = Date.parse(asOfIso);
+  if (!Number.isFinite(asOfTime)) {
+    return { days: [] };
+  }
+
+  const templateById = new Map((templates || []).map((item) => [item.id, item]));
+  const aggregatesByDay = new Map();
+  let earliestDayKey = null;
+
+  for (const entry of entries || []) {
+    const performedTime = Date.parse(entry.performedAtIso);
+    if (!Number.isFinite(performedTime) || performedTime > asOfTime) {
+      continue;
+    }
+
+    const template = templateById.get(entry.templateId);
+    if (!template) {
+      continue;
+    }
+
+    const dayKey = toLocalDayKey(entry.performedAtIso);
+    if (!dayKey) {
+      continue;
+    }
+
+    if (!earliestDayKey || dayKey < earliestDayKey) {
+      earliestDayKey = dayKey;
+    }
+
+    if (!aggregatesByDay.has(dayKey)) {
+      aggregatesByDay.set(dayKey, {
+        totalLoad: 0,
+        byJoint: createZeroJointMap()
+      });
+    }
+
+    const computed = computeEntryJointLoad(entry, template);
+    const current = aggregatesByDay.get(dayKey);
+    current.totalLoad += computed.sessionLoad;
+
+    for (const jointId of JOINT_IDS) {
+      current.byJoint[jointId] += computed.byJoint[jointId] || 0;
+    }
+  }
+
+  if (!earliestDayKey) {
+    return { days: [] };
+  }
+
+  const startDate = localMidnightFromDayKey(earliestDayKey);
+  const endDate = localMidnightFromDayKey(toLocalDayKey(asOfIso));
+  if (!startDate || !endDate || startDate > endDate) {
+    return { days: [] };
+  }
+
+  const days = [];
+  const cursor = new Date(startDate);
+  while (cursor <= endDate) {
+    const dayKey = formatDayKeyFromDate(cursor);
+    const aggregate = aggregatesByDay.get(dayKey);
+    const byJoint = aggregate ? roundJointMap(aggregate.byJoint) : createZeroJointMap();
+    const totalLoad = aggregate ? Number(aggregate.totalLoad.toFixed(3)) : 0;
+
+    days.push({
+      dayKey,
+      totalLoad,
+      byJoint
+    });
+
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return { days };
+}
+
+export function selectTopJointSeries({ days, jointIds = JOINT_IDS, count = 4 }) {
+  const totals = {};
+  const indexByJoint = new Map();
+  jointIds.forEach((jointId, index) => {
+    totals[jointId] = 0;
+    indexByJoint.set(jointId, index);
+  });
+
+  for (const day of days || []) {
+    for (const jointId of jointIds) {
+      totals[jointId] += Number(day?.byJoint?.[jointId] || 0);
+    }
+  }
+
+  return [...jointIds]
+    .sort((a, b) => {
+      const diff = totals[b] - totals[a];
+      if (diff !== 0) {
+        return diff;
+      }
+      return (indexByJoint.get(a) || 0) - (indexByJoint.get(b) || 0);
+    })
+    .slice(0, Math.max(0, count));
+}
+
+export function buildUnifiedLoadChart({ days, jointIds = JOINT_IDS }) {
+  const safeDays = days || [];
+  const safeJointIds = jointIds || JOINT_IDS;
+  const seriesKeys = ["total", ...safeJointIds];
+  let maxValue = 0;
+
+  const chartDays = safeDays.map((day) => {
+    const values = {
+      total: Number(day?.totalLoad || 0)
+    };
+    maxValue = Math.max(maxValue, values.total);
+
+    for (const jointId of safeJointIds) {
+      values[jointId] = Number(day?.byJoint?.[jointId] || 0);
+      maxValue = Math.max(maxValue, values[jointId]);
+    }
+
+    return {
+      dayKey: day.dayKey,
+      values
+    };
+  });
+
+  return {
+    seriesKeys,
+    maxValue: Number(maxValue.toFixed(3)),
+    days: chartDays
+  };
+}
+
+export function buildDailyRiskGuideFromSummary({
+  loadSummary,
+  jointIds = JOINT_IDS,
+  windowDays = 14
+}) {
+  if (!loadSummary?.byJoint || !Number.isFinite(windowDays) || windowDays <= 0) {
+    return null;
+  }
+
+  const candidates = [];
+  for (const jointId of jointIds || []) {
+    const joint = loadSummary.byJoint[jointId];
+    const chronicLoad = Number(joint?.chronicLoad);
+    if (!Number.isFinite(chronicLoad) || chronicLoad <= 0) {
+      continue;
+    }
+
+    const toleranceFactor = Math.max(0.01, Number(joint?.toleranceFactor) || 1);
+    const dailyBase = chronicLoad / windowDays;
+    const moderateDailyThreshold = dailyBase * 1.15 * toleranceFactor;
+    const highDailyThreshold = dailyBase * 1.35 * toleranceFactor;
+
+    candidates.push({
+      jointId,
+      moderateDailyThreshold,
+      highDailyThreshold
+    });
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((a, b) => a.highDailyThreshold - b.highDailyThreshold);
+  const selected = candidates[0];
+
+  return {
+    referenceJointId: selected.jointId,
+    moderateDailyThreshold: Number(selected.moderateDailyThreshold.toFixed(3)),
+    highDailyThreshold: Number(selected.highDailyThreshold.toFixed(3))
+  };
+}
+
+function formatLegendThreshold(value) {
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
+  return `${Number(value.toFixed(1))}`;
+}
+
+export function buildRiskCategoryLegend({ riskGuide }) {
+  if (!riskGuide) {
+    return [
+      { category: "low", label: "Low", color: "#1e7d55" },
+      { category: "medium", label: "Medium", color: "#c99335" },
+      { category: "high", label: "High", color: "#b83737" }
+    ];
+  }
+
+  const moderate = formatLegendThreshold(riskGuide.moderateDailyThreshold);
+  const high = formatLegendThreshold(riskGuide.highDailyThreshold);
+
+  return [
+    { category: "low", label: `Low (< ${moderate})`, color: "#1e7d55" },
+    { category: "medium", label: `Medium (${moderate} - ${high})`, color: "#c99335" },
+    { category: "high", label: `High (>= ${high})`, color: "#b83737" }
+  ];
 }
 
 function toRisk(adjustedRatio) {

@@ -36,6 +36,36 @@ This runs:
 
 If this command passes, your app is in a much safer state before scanning on a device.
 
+### Development Verification Loop (recommended)
+
+Use this short loop while building features:
+
+1. Fast logic checks before coding and after each change:
+```bash
+npm test
+npm run mobile:test
+```
+2. Full mobile preflight before manual QA:
+```bash
+npm run mobile:verify
+```
+3. Interactive iOS simulator run:
+```bash
+npm run ios:run
+```
+4. Automated UI flow + screenshots (for regression checks and design review):
+```bash
+npm run ios:maestro:test
+```
+5. Review generated screenshots:
+- `mobile/.derived-data/maestro/artifacts/screenshots`
+
+If the simulator shows `No script URL provided`, start Metro and relaunch:
+```bash
+npm run mobile:start
+npm run ios:run
+```
+
 ### iOS Simulator E2E with Maestro
 
 Prerequisites:
