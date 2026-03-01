@@ -66,6 +66,43 @@ npm run mobile:start
 npm run ios:run
 ```
 
+### Feature UI Tests (Reusable Maestro Harness)
+
+Use one reusable feature runner that always does:
+
+1. `ios:maestro:prepare`
+2. Run one Maestro feature flow
+3. `ios:maestro:teardown` (always, even on failure)
+
+Run the joint load visualization feature test:
+
+```bash
+npm run ios:maestro:test:joint-load
+```
+
+Joint-load flow path (stable, no scroll dependency):
+
+1. Open `Load Map`
+2. Tap `Add session`
+3. Open `Visualization`
+4. Assert chart + risk legend IDs
+
+Run any feature flow with the same setup/teardown:
+
+```bash
+npm run ios:maestro:test:feature -- mobile/.maestro/features/<feature-name>.yaml
+```
+
+Feature artifacts are written to:
+
+- `mobile/.derived-data/maestro/features/<feature-name>/`
+
+For new feature UI flows, prefer:
+
+1. Dedicated view/screen for the feature being tested
+2. Stable `testID` selectors instead of text/position selectors
+3. Flow assertions scoped to that feature view only
+
 ### iOS Simulator E2E with Maestro
 
 Prerequisites:
@@ -104,6 +141,7 @@ This command now runs `prepare -> test -> teardown`, so the simulator app sessio
 Current flow file:
 
 - `mobile/.maestro/adaptive-checkin-load-map.yaml`
+- `mobile/.maestro/features/joint-load-visualization.yaml`
 
 ### Build a downloadable iOS app (TestFlight/internal)
 
@@ -180,6 +218,8 @@ After build completes, install using the provided link/TestFlight.
 - `npm run ios:run`: build and launch app in iOS simulator
 - `npm run ios:maestro:prepare`: install pods, build Release simulator app, install + launch app
 - `npm run ios:maestro:test`: run Maestro flows and write artifacts to `mobile/.derived-data/maestro`
+- `npm run ios:maestro:test:feature`: reusable feature runner (`prepare -> feature flow -> teardown`)
+- `npm run ios:maestro:test:joint-load`: joint-load visualization feature UI test
 - `npm run ios:maestro:teardown`: terminate app + shutdown simulator + close Simulator app
 - `npm run e2e:maestro`: run `ios:maestro:prepare`, `ios:maestro:test`, and always `ios:maestro:teardown`
 

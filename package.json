@@ -19,6 +19,8 @@
     "ios:run:expo": "npm --prefix mobile run ios:run:expo",
     "ios:maestro:prepare": "node scripts/ios-maestro-prepare.mjs",
     "ios:maestro:test": "maestro -p ios test mobile/.maestro --format junit --output mobile/.derived-data/maestro/results.xml --test-output-dir mobile/.derived-data/maestro/artifacts --debug-output mobile/.derived-data/maestro/debug --flatten-debug-output",
+    "ios:maestro:test:feature": "node scripts/ios-maestro-feature-session.mjs",
+    "ios:maestro:test:joint-load": "npm run ios:maestro:test:feature -- mobile/.maestro/features/joint-load-visualization.yaml",
     "ios:maestro:teardown": "node scripts/ios-maestro-teardown.mjs",
     "e2e:maestro": "node scripts/ios-maestro-session.mjs"
   },

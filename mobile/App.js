@@ -250,6 +250,201 @@ export default function App() {
         )} (${dailyLoadSeries.days.length} days)`
       : "No tracking data yet";
 
+  const loadVisualizationCard = (
+    <View style={styles.card}>
+      <View style={styles.loadChartHeaderRow}>
+        <Text style={styles.sectionTitle}>Load Over Time</Text>
+        <Pressable
+          testID="btn-toggle-joint-series"
+          onPress={() => setShowAllJointSeries((value) => !value)}
+          style={styles.chartToggleButton}
+        >
+          <Text style={styles.chartToggleButtonText}>
+            {showAllJointSeries ? "Show top joints" : "Show all joints"}
+          </Text>
+        </Pressable>
+      </View>
+      <Text style={styles.loadChartSubText}>Tracking period: {chartRangeText}</Text>
+
+      {dailyLoadSeries.days.length === 0 ? (
+        <Text style={styles.chartEmptyText}>Add sessions to unlock daily load trends.</Text>
+      ) : (
+        <>
+          <View style={styles.seriesLegendRow}>
+            <View style={styles.seriesLegendItem}>
+              <View style={[styles.seriesLegendDot, { backgroundColor: "#0f6b47" }]} />
+              <Text style={styles.seriesLegendText}>Total</Text>
+            </View>
+            {visibleJointSeries.map((jointId) => (
+              <View key={`legend-${jointId}`} style={styles.seriesLegendItem}>
+                <View
+                  style={[
+                    styles.seriesLegendDot,
+                    { backgroundColor: JOINT_SERIES_COLORS[jointId] || "#7ca08f" }
+                  ]}
+                />
+                <Text style={styles.seriesLegendText}>{formatJointLabel(jointId)}</Text>
+              </View>
+            ))}
+          </View>
+
+          {riskGuide ? (
+            <Text style={styles.riskGuideText}>
+              Risk guides ({formatJointLabel(riskGuide.referenceJointId)}): moderate{" "}
+              {formatLoadValue(riskGuide.moderateDailyThreshold)} / high{" "}
+              {formatLoadValue(riskGuide.highDailyThreshold)}
+            </Text>
+          ) : (
+            <Text style={styles.riskGuideText}>Risk guides will appear after enough load history.</Text>
+          )}
+
+          <View style={styles.riskCategoryLegendRow}>
+            {riskLegend.map((item) => (
+              <View key={`risk-${item.category}`} style={styles.riskCategoryLegendItem}>
+                {item.category === "low" ? (
+                  <View
+                    style={[
+                      styles.riskCategorySolidSwatch,
+                      { backgroundColor: item.color }
+                    ]}
+                  />
+                ) : (
+                  <View style={styles.riskCategoryDashSwatch}>
+                    {Array.from({ length: 4 }).map((_, dashIndex) => (
+                      <View
+                        key={`${item.category}-dash-${dashIndex}`}
+                        style={[styles.riskCategoryDash, { backgroundColor: item.color }]}
+                      />
+                    ))}
+                  </View>
+                )}
+                <Text testID={`risk-category-${item.category}`} style={styles.riskCategoryLegendText}>
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.chartBlock}>
+            <Text style={styles.chartBlockTitle}>Daily load comparison (shared axis)</Text>
+            <View testID="chart-shared-axis" style={styles.unifiedChartFrame}>
+              <View style={styles.unifiedAxisColumn}>
+                <Text style={styles.unifiedAxisLabel}>
+                  {formatLoadValue(chartAxisMax)}
+                </Text>
+                <Text style={styles.unifiedAxisLabel}>0</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.unifiedChartScrollContent}>
+                  {unifiedLoadChart.days.map((day, index) => {
+                    const showTick = shouldRenderDayTick(index, unifiedLoadChart.days.length);
+                    return (
+                      <View key={`group-${day.dayKey}`} style={styles.unifiedDayGroup}>
+                        <View style={[styles.unifiedDayBarsTrack, { width: dayTrackWidth }]}>
+                          {unifiedLoadChart.seriesKeys.map((seriesKey) => {
+                            const value = Number(day.values?.[seriesKey] || 0);
+                            const barHeight = toScaledBarHeight(
+                              value,
+                              chartAxisMax,
+                              UNIFIED_CHART_HEIGHT
+                            );
+                            const backgroundColor =
+                              seriesKey === "total"
+                                ? "#0f6b47"
+                                : JOINT_SERIES_COLORS[seriesKey] || "#7ca08f";
+
+                            return (
+                              <View key={`${seriesKey}-${day.dayKey}`} style={styles.unifiedSeriesColumn}>
+                                {value > 0 ? (
+                                  <Text style={styles.unifiedSeriesValueTag}>
+                                    {formatLoadValue(value)}
+                                  </Text>
+                                ) : (
+                                  <View style={styles.unifiedSeriesValueSpacer} />
+                                )}
+                                <View
+                                  style={[
+                                    styles.unifiedSeriesBar,
+                                    {
+                                      height: barHeight,
+                                      backgroundColor
+                                    }
+                                  ]}
+                                />
+                              </View>
+                            );
+                          })}
+                          {riskGuide ? (
+                            <>
+                              <View
+                                style={[
+                                  styles.unifiedRiskDashRow,
+                                  {
+                                    bottom: Math.max(
+                                      14,
+                                      toScaledAxisOffset(
+                                        riskGuide.highDailyThreshold,
+                                        chartAxisMax,
+                                        UNIFIED_CHART_HEIGHT
+                                      )
+                                    )
+                                  }
+                                ]}
+                              >
+                                {Array.from({ length: 12 }).map((_, dashIndex) => (
+                                  <View
+                                    key={`high-${day.dayKey}-${dashIndex}`}
+                                    style={[styles.unifiedRiskDash, { backgroundColor: "#b83737" }]}
+                                  />
+                                ))}
+                              </View>
+                              <View
+                                style={[
+                                  styles.unifiedRiskDashRow,
+                                  {
+                                    bottom: Math.max(
+                                      8,
+                                      toScaledAxisOffset(
+                                        riskGuide.moderateDailyThreshold,
+                                        chartAxisMax,
+                                        UNIFIED_CHART_HEIGHT
+                                      )
+                                    )
+                                  }
+                                ]}
+                              >
+                                {Array.from({ length: 12 }).map((_, dashIndex) => (
+                                  <View
+                                    key={`moderate-${day.dayKey}-${dashIndex}`}
+                                    style={[styles.unifiedRiskDash, { backgroundColor: "#c99335" }]}
+                                  />
+                                ))}
+                              </View>
+                            </>
+                          ) : null}
+                        </View>
+                        <Text style={styles.unifiedDayLabel}>
+                          {showTick ? formatDayLabel(day.dayKey) : ""}
+                        </Text>
+                        <Text style={styles.unifiedDayTotalLabel}>
+                          T {formatLoadValue(day.values.total)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+
+          <Text testID="hint-risk-categories" style={styles.sharedAxisHint}>
+            Risk guides map to Low, Medium, and High categories. Values above bars show exact daily load.
+          </Text>
+        </>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView testID="main-scroll" contentContainerStyle={styles.container}>
@@ -291,6 +486,25 @@ export default function App() {
               ]}
             >
               Load Map
+            </Text>
+          </Pressable>
+          <Pressable
+            testID="btn-view-visualization"
+            onPress={() => setActiveView("visualization")}
+            style={[
+              styles.viewToggle,
+              activeView === "visualization" ? styles.viewToggleActive : styles.viewToggleInactive
+            ]}
+          >
+            <Text
+              style={[
+                styles.viewToggleText,
+                activeView === "visualization"
+                  ? styles.viewToggleTextActive
+                  : styles.viewToggleTextInactive
+              ]}
+            >
+              Visualization
             </Text>
           </Pressable>
         </View>
@@ -368,10 +582,15 @@ export default function App() {
               ) : null}
             </View>
           </>
-        ) : (
+        ) : activeView === "load" ? (
           <>
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Quick Add Session</Text>
+              <View style={styles.quickAddHeaderRow}>
+                <Text style={styles.sectionTitle}>Quick Add Session</Text>
+                <Pressable testID="btn-add-session" style={styles.quickAddButton} onPress={handleAddEntry}>
+                  <Text style={styles.quickAddButtonText}>Add session</Text>
+                </Pressable>
+              </View>
 
               <Text style={styles.label}>Exercise template</Text>
               <View style={styles.wrapRow}>
@@ -500,201 +719,18 @@ export default function App() {
 
               {entryError ? <Text style={styles.errorText}>{entryError}</Text> : null}
 
-              <Pressable testID="btn-add-session" style={styles.addButton} onPress={handleAddEntry}>
+              <Pressable style={styles.addButton} onPress={handleAddEntry}>
                 <Text style={styles.addButtonText}>Add session</Text>
               </Pressable>
             </View>
 
-            <View style={styles.card}>
-              <View style={styles.loadChartHeaderRow}>
-                <Text style={styles.sectionTitle}>Load Over Time</Text>
-                <Pressable
-                  testID="btn-toggle-joint-series"
-                  onPress={() => setShowAllJointSeries((value) => !value)}
-                  style={styles.chartToggleButton}
-                >
-                  <Text style={styles.chartToggleButtonText}>
-                    {showAllJointSeries ? "Show top joints" : "Show all joints"}
-                  </Text>
-                </Pressable>
-              </View>
-              <Text style={styles.loadChartSubText}>Tracking period: {chartRangeText}</Text>
-
-              {dailyLoadSeries.days.length === 0 ? (
-                <Text style={styles.chartEmptyText}>Add sessions to unlock daily load trends.</Text>
-              ) : (
-                <>
-                  <View style={styles.seriesLegendRow}>
-                    <View style={styles.seriesLegendItem}>
-                      <View style={[styles.seriesLegendDot, { backgroundColor: "#0f6b47" }]} />
-                      <Text style={styles.seriesLegendText}>Total</Text>
-                    </View>
-                    {visibleJointSeries.map((jointId) => (
-                      <View key={`legend-${jointId}`} style={styles.seriesLegendItem}>
-                        <View
-                          style={[
-                            styles.seriesLegendDot,
-                            { backgroundColor: JOINT_SERIES_COLORS[jointId] || "#7ca08f" }
-                          ]}
-                        />
-                        <Text style={styles.seriesLegendText}>{formatJointLabel(jointId)}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {riskGuide ? (
-                    <Text style={styles.riskGuideText}>
-                      Risk guides ({formatJointLabel(riskGuide.referenceJointId)}): moderate{" "}
-                      {formatLoadValue(riskGuide.moderateDailyThreshold)} / high{" "}
-                      {formatLoadValue(riskGuide.highDailyThreshold)}
-                    </Text>
-                  ) : (
-                    <Text style={styles.riskGuideText}>Risk guides will appear after enough load history.</Text>
-                  )}
-
-                  <View style={styles.riskCategoryLegendRow}>
-                    {riskLegend.map((item) => (
-                      <View key={`risk-${item.category}`} style={styles.riskCategoryLegendItem}>
-                        {item.category === "low" ? (
-                          <View
-                            style={[
-                              styles.riskCategorySolidSwatch,
-                              { backgroundColor: item.color }
-                            ]}
-                          />
-                        ) : (
-                          <View style={styles.riskCategoryDashSwatch}>
-                            {Array.from({ length: 4 }).map((_, dashIndex) => (
-                              <View
-                                key={`${item.category}-dash-${dashIndex}`}
-                                style={[styles.riskCategoryDash, { backgroundColor: item.color }]}
-                              />
-                            ))}
-                          </View>
-                        )}
-                        <Text style={styles.riskCategoryLegendText}>{item.label}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <View style={styles.chartBlock}>
-                    <Text style={styles.chartBlockTitle}>Daily load comparison (shared axis)</Text>
-                    <View testID="chart-shared-axis" style={styles.unifiedChartFrame}>
-                      <View style={styles.unifiedAxisColumn}>
-                        <Text style={styles.unifiedAxisLabel}>
-                          {formatLoadValue(chartAxisMax)}
-                        </Text>
-                        <Text style={styles.unifiedAxisLabel}>0</Text>
-                      </View>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={styles.unifiedChartScrollContent}>
-                          {unifiedLoadChart.days.map((day, index) => {
-                            const showTick = shouldRenderDayTick(index, unifiedLoadChart.days.length);
-                            return (
-                              <View key={`group-${day.dayKey}`} style={styles.unifiedDayGroup}>
-                                <View style={[styles.unifiedDayBarsTrack, { width: dayTrackWidth }]}>
-                                  {unifiedLoadChart.seriesKeys.map((seriesKey) => {
-                                    const value = Number(day.values?.[seriesKey] || 0);
-                                    const barHeight = toScaledBarHeight(
-                                      value,
-                                      chartAxisMax,
-                                      UNIFIED_CHART_HEIGHT
-                                    );
-                                    const backgroundColor =
-                                      seriesKey === "total"
-                                        ? "#0f6b47"
-                                        : JOINT_SERIES_COLORS[seriesKey] || "#7ca08f";
-
-                                    return (
-                                      <View key={`${seriesKey}-${day.dayKey}`} style={styles.unifiedSeriesColumn}>
-                                        {value > 0 ? (
-                                          <Text style={styles.unifiedSeriesValueTag}>
-                                            {formatLoadValue(value)}
-                                          </Text>
-                                        ) : (
-                                          <View style={styles.unifiedSeriesValueSpacer} />
-                                        )}
-                                        <View
-                                          style={[
-                                            styles.unifiedSeriesBar,
-                                            {
-                                              height: barHeight,
-                                              backgroundColor
-                                            }
-                                          ]}
-                                        />
-                                      </View>
-                                    );
-                                  })}
-                                  {riskGuide ? (
-                                    <>
-                                      <View
-                                        style={[
-                                          styles.unifiedRiskDashRow,
-                                          {
-                                            bottom: Math.max(
-                                              14,
-                                              toScaledAxisOffset(
-                                                riskGuide.highDailyThreshold,
-                                                chartAxisMax,
-                                                UNIFIED_CHART_HEIGHT
-                                              )
-                                            )
-                                          }
-                                        ]}
-                                      >
-                                        {Array.from({ length: 12 }).map((_, dashIndex) => (
-                                          <View
-                                            key={`high-${day.dayKey}-${dashIndex}`}
-                                            style={[styles.unifiedRiskDash, { backgroundColor: "#b83737" }]}
-                                          />
-                                        ))}
-                                      </View>
-                                      <View
-                                        style={[
-                                          styles.unifiedRiskDashRow,
-                                          {
-                                            bottom: Math.max(
-                                              8,
-                                              toScaledAxisOffset(
-                                                riskGuide.moderateDailyThreshold,
-                                                chartAxisMax,
-                                                UNIFIED_CHART_HEIGHT
-                                              )
-                                            )
-                                          }
-                                        ]}
-                                      >
-                                        {Array.from({ length: 12 }).map((_, dashIndex) => (
-                                          <View
-                                            key={`moderate-${day.dayKey}-${dashIndex}`}
-                                            style={[styles.unifiedRiskDash, { backgroundColor: "#c99335" }]}
-                                          />
-                                        ))}
-                                      </View>
-                                    </>
-                                  ) : null}
-                                </View>
-                                <Text style={styles.unifiedDayLabel}>
-                                  {showTick ? formatDayLabel(day.dayKey) : ""}
-                                </Text>
-                                <Text style={styles.unifiedDayTotalLabel}>
-                                  T {formatLoadValue(day.values.total)}
-                                </Text>
-                              </View>
-                            );
-                          })}
-                        </View>
-                      </ScrollView>
-                    </View>
-                  </View>
-
-                  <Text style={styles.sharedAxisHint}>
-                    Risk guides map to Low, Medium, and High categories. Values above bars show exact daily load.
-                  </Text>
-                </>
-              )}
-            </View>
+            <Pressable
+              testID="btn-open-visualization"
+              onPress={() => setActiveView("visualization")}
+              style={styles.visualizationShortcut}
+            >
+              <Text style={styles.visualizationShortcutText}>Open joint-load visualization</Text>
+            </Pressable>
 
             <View style={styles.resultCard}>
               <Text style={styles.resultTitle}>Caution + Guidance</Text>
@@ -738,6 +774,16 @@ export default function App() {
               </View>
             ) : null}
           </>
+        ) : (
+          <View testID="view-joint-load-visualization" style={styles.visualizationView}>
+            {loadVisualizationCard}
+            <View style={styles.resultCard}>
+              <Text style={styles.resultTitle}>Caution + Guidance</Text>
+              <Text style={styles.resultItem}>Overall risk: {loadSummary.overallRisk}</Text>
+              <Text style={styles.resultText}>Top stressed joints: {topJointText || "N/A"}</Text>
+              <Text style={styles.resultText}>Total load (14d): {loadSummary.totalBodyLoad}</Text>
+            </View>
+          </View>
         )}
       </ScrollView>
       <StatusBar style="dark" />
@@ -754,7 +800,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 34, fontWeight: "700", color: "#0d3b2a" },
   subtitle: { fontSize: 16, color: "#245f48" },
-  viewToggleRow: { flexDirection: "row", gap: 8 },
+  viewToggleRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   viewToggle: {
     borderRadius: 999,
     paddingVertical: 8,
@@ -771,6 +817,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12
   },
+  visualizationView: { gap: 18 },
   sectionTitle: { fontSize: 18, color: "#0d3b2a", fontWeight: "700" },
   label: { fontSize: 14, color: "#1a3d30", fontWeight: "600" },
   input: {
@@ -810,6 +857,19 @@ const styles = StyleSheet.create({
   resultText: { color: "#eafcf3", fontSize: 14, lineHeight: 20 },
   overrideNote: { color: "#ffe3a3", fontSize: 13, fontWeight: "700" },
   errorText: { color: "#962e2e", fontSize: 13, fontWeight: "600" },
+  quickAddHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  quickAddButton: {
+    backgroundColor: "#0f6b47",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  quickAddButtonText: { color: "#ffffff", fontWeight: "700", fontSize: 12 },
   addButton: {
     backgroundColor: "#0f6b47",
     borderRadius: 12,
@@ -817,6 +877,14 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   addButtonText: { color: "#ffffff", fontWeight: "700", fontSize: 15 },
+  visualizationShortcut: {
+    alignSelf: "flex-start",
+    backgroundColor: "#deebe3",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  visualizationShortcutText: { color: "#1d4c38", fontWeight: "700" },
   loadChartHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
