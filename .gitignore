@@ -5,4 +5,3 @@ coverage/
 .npm-cache/
 mobile/.derived-data/
 mobile/.xcode-home/
-mobile/.maestro/

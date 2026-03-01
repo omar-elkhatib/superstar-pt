@@ -20,7 +20,9 @@
     "ios:test:ui": "cd mobile/ios && xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -configuration Release -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.derived-data -resultBundlePath ../.derived-data/UIFeedback-release-$(date +%Y%m%d-%H%M%S).xcresult -only-testing:SuperstarPTUITests",
     "ios:test:ui:extract": "node scripts/export-ui-screenshots.mjs",
     "ios:test:artifacts": "node scripts/ios-test-artifacts.mjs",
-    "e2e:maestro": "maestro test mobile/.maestro"
+    "ios:maestro:prepare": "node scripts/ios-maestro-prepare.mjs",
+    "ios:maestro:test": "maestro -p ios test mobile/.maestro --format junit --output mobile/.derived-data/maestro/results.xml --test-output-dir mobile/.derived-data/maestro/artifacts --debug-output mobile/.derived-data/maestro/debug --flatten-debug-output",
+    "e2e:maestro": "npm run ios:maestro:prepare && npm run ios:maestro:test"
   },
   "keywords": [
     "physiotherapy",

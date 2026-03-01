@@ -7,6 +7,8 @@ This guide is only about local package/environment setup required to make unit t
 1. Node.js 20+
 2. Xcode (with Command Line Tools)
 3. CocoaPods
+4. Java 17+ (required by Maestro CLI)
+5. Maestro CLI (`curl -Ls "https://get.maestro.mobile.dev" | bash`)
 
 Check:
 
@@ -16,6 +18,8 @@ npm -v
 xcodebuild -version
 xcrun simctl list devices
 pod --version
+java -version
+maestro --version
 ```
 
 If Xcode path is wrong:
@@ -68,6 +72,12 @@ cd mobile/ios
 xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.derived-data -only-testing:SuperstarPTTests
 ```
 
+Run migrated iOS Maestro flow:
+
+```bash
+npm run e2e:maestro
+```
+
 ## 6) Common setup failures
 
 - `Project is incompatible with this version of Expo Go`:
@@ -78,3 +88,5 @@ xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -destinat
   install iOS runtime in Xcode and re-check `xcrun simctl list devices`.
 - `pod install` fails fetching dependencies:
   environment/network issue; re-run after restoring connectivity/permissions.
+- `maestro` fails with Java version errors:
+  install Java 17+ and ensure `java -version` resolves to that runtime.

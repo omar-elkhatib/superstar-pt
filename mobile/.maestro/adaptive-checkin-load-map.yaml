@@ -1,0 +1,41 @@
+appId: com.omarelkhatib.superstarpt
+---
+- clearState
+- launchApp
+- assertVisible:
+    id: screen-home-title
+- takeScreenshot: home
+- tapOn:
+    id: btn-readiness-high
+- assertVisible:
+    id: result-action-label
+- assertVisible: "Action: progress"
+- takeScreenshot: after_high_readiness
+- swipe:
+    direction: UP
+- takeScreenshot: after_swipe
+- tapOn:
+    id: btn-view-load-map
+- scrollUntilVisible:
+    element:
+      id: btn-add-session
+    direction: DOWN
+- assertVisible:
+    id: btn-add-session
+- takeScreenshot: load_map
+- tapOn:
+    id: btn-add-session
+- scrollUntilVisible:
+    element:
+      id: joint-cell-ankle
+    direction: DOWN
+- assertVisible:
+    id: joint-cell-ankle
+- scrollUntilVisible:
+    element:
+      id: btn-toggle-history
+    direction: DOWN
+- tapOn:
+    id: btn-toggle-history
+- assertVisible: Exercise History
+- takeScreenshot: load_map_history

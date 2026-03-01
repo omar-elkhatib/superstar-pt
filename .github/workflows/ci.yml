@@ -51,3 +51,56 @@ jobs:
 
       - name: Mobile tests
         run: npm run mobile:test
+
+  ios-maestro-e2e:
+    runs-on: macos-latest
+    env:
+      MAESTRO_CLI_NO_ANALYTICS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install mobile dependencies
+        run: npm run mobile:install
+
+      - name: Verify iOS tooling
+        run: xcodebuild -version && xcrun simctl list devices && pod --version
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Maestro CLI
+        run: maestro --version
+
+      - name: Run iOS Maestro E2E
+        run: npm run e2e:maestro
+
+      - name: Upload Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-ios-artifacts
+          path: |
+            mobile/.derived-data/maestro
+            mobile/.expo/xcodebuild.log
+          if-no-files-found: warn

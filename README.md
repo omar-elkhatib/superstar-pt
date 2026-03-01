@@ -70,7 +70,8 @@ Prerequisites:
 sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 ```
 2. iOS simulator runtime available (`xcrun simctl list devices` should work).
-3. Maestro CLI installed:
+3. Java 17+ available (`java -version`).
+4. Maestro CLI installed:
 ```bash
 curl -Ls "https://get.maestro.mobile.dev" | bash
 ```
@@ -78,13 +79,12 @@ curl -Ls "https://get.maestro.mobile.dev" | bash
 Run flow:
 
 ```bash
-npm run ios:run
 npm run e2e:maestro
 ```
 
 Current flow file:
 
-- `mobile/.maestro/smoke.yaml`
+- `mobile/.maestro/adaptive-checkin-load-map.yaml`
 
 ### Build a downloadable iOS app (TestFlight/internal)
 
@@ -160,7 +160,9 @@ After build completes, install using the provided link/TestFlight.
 - `npm run test:all`: run root tests and mobile tests together
 - `npm run ios:run`: build and launch app in iOS simulator
 - `npm run ios:test:ui`: run XCUITest UI flow and store screenshots in `.xcresult`
-- `npm run e2e:maestro`: run Maestro E2E flows in `mobile/.maestro`
+- `npm run ios:maestro:prepare`: install pods, build Release simulator app, install + launch app
+- `npm run ios:maestro:test`: run Maestro flows and write artifacts to `mobile/.derived-data/maestro`
+- `npm run e2e:maestro`: run `ios:maestro:prepare` followed by `ios:maestro:test`
 
 ## Initial architecture
 
