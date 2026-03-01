@@ -15,8 +15,6 @@
     "mobile:test": "npm --prefix mobile run test",
     "mobile:verify": "npm --prefix mobile run verify",
     "test:all": "npm test && npm run mobile:test",
-    "ios:run": "node scripts/ios-run.mjs",
-    "ios:run:expo": "npm --prefix mobile run ios:run:expo",
     "ios:maestro:prepare": "node scripts/ios-maestro-prepare.mjs",
     "ios:maestro:test": "node scripts/ios-maestro-suite-test.mjs",
     "ios:maestro:test:feature": "node scripts/ios-maestro-feature-session.mjs",

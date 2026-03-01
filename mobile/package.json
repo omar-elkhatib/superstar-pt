@@ -6,8 +6,6 @@
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
-    "ios:run": "npm run ios:run:expo",
-    "ios:run:expo": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
     "test:logic": "node --test test/*.test.mjs",
