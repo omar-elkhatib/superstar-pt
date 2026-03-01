@@ -9,7 +9,6 @@ import {
   shouldIgnoreLingeringSimulatorFailure,
   buildSimctlShutdownArgs,
   buildSimctlTerminateArgs,
-  buildExpoRunArgs,
   parseLaunchPid,
   readBundleIdentifier,
   selectSimulatorDevice
@@ -72,20 +71,6 @@ test("readBundleIdentifier loads bundle ID from app.json", () => {
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
-});
-
-test("buildExpoRunArgs configures no-bundler device run", () => {
-  const args = buildExpoRunArgs("iPhone 17");
-  assert.deepEqual(args, [
-    "--prefix",
-    "mobile",
-    "run",
-    "ios:run:expo",
-    "--",
-    "--device",
-    "iPhone 17",
-    "--no-bundler"
-  ]);
 });
 
 test("buildReleaseBuildArgs configures release simulator build", () => {

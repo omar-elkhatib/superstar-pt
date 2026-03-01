@@ -85,10 +85,6 @@ export function readBundleIdentifier(appJsonPath) {
   return bundleId;
 }
 
-export function buildExpoRunArgs(deviceName) {
-  return ["--prefix", "mobile", "run", "ios:run:expo", "--", "--device", deviceName, "--no-bundler"];
-}
-
 export function buildReleaseBuildArgs(deviceName) {
   return [
     "build",

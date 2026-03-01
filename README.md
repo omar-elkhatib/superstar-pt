@@ -49,9 +49,9 @@ npm run mobile:test
 ```bash
 npm run mobile:verify
 ```
-3. Interactive iOS simulator run:
+3. Interactive mobile dev loop:
 ```bash
-npm run ios:run
+npm run mobile:start
 ```
 4. Automated UI flow + screenshots (for regression checks and design review):
 ```bash
@@ -61,10 +61,9 @@ npm run ios:maestro:test
 - `mobile/.derived-data/maestro/core/artifacts/screenshots`
 - `mobile/.derived-data/maestro/features/artifacts/screenshots`
 
-If the simulator shows `No script URL provided`, start Metro and relaunch:
+If the simulator shows `No script URL provided`, restart Metro and relaunch from Expo:
 ```bash
 npm run mobile:start
-npm run ios:run
 ```
 
 ### Feature UI Tests (Reusable Maestro Harness)
@@ -226,7 +225,6 @@ After build completes, install using the provided link/TestFlight.
 - `npm run mobile:test`: run mobile logic + config tests
 - `npm run mobile:verify`: run mobile tests + Expo config + iOS bundle export
 - `npm run test:all`: run root tests and mobile tests together
-- `npm run ios:run`: build and launch app in iOS simulator
 - `npm run ios:maestro:prepare`: install pods, build Release simulator app, install + launch app
 - `npm run ios:maestro:test`: run Maestro `core` + `features` suites and write artifacts to `mobile/.derived-data/maestro/{core,features}`
 - `npm run ios:maestro:test:feature`: reusable feature runner (`prepare -> feature flow -> teardown`)
