@@ -133,6 +133,15 @@ export function isSimctlBootAlreadySatisfiedError(output) {
   );
 }
 
+export function isOsascriptUserCanceledError(output) {
+  const value = output || "";
+  return /User canceled\.\s*\(-128\)/i.test(value);
+}
+
+export function shouldIgnoreLingeringSimulatorFailure({ env = {}, osascriptOutput = "" } = {}) {
+  return Boolean(env.CI) && isOsascriptUserCanceledError(osascriptOutput);
+}
+
 export function buildKillallSimulatorArgs() {
   return ["Simulator"];
 }
