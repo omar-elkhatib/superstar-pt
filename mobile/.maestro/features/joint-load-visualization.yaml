@@ -1,0 +1,25 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- runFlow: ../fixtures/load-map-add-session.yaml
+- tapOn:
+    id: btn-view-visualization
+- assertVisible:
+    id: view-joint-load-visualization
+- assertVisible:
+    id: chart-shared-axis
+- assertVisible: "Daily load comparison (shared axis)"
+- assertVisible:
+    id: risk-category-low
+- assertVisible:
+    id: risk-category-medium
+- assertVisible:
+    id: risk-category-high
+- assertVisible:
+    id: hint-risk-categories
+- assertVisible: "T 120"
+- takeScreenshot: joint_load_visualization
+- tapOn:
+    id: btn-toggle-joint-series
+- assertVisible: "Show top joints"
+- takeScreenshot: joint_load_visualization_all_joints

@@ -1,9 +1,6 @@
 appId: com.omarelkhatib.superstarpt
 ---
-- clearState
-- launchApp
-- assertVisible:
-    id: screen-home-title
+- runFlow: fixtures/session-start.yaml
 - takeScreenshot: home
 - tapOn:
     id: btn-readiness-high
@@ -27,10 +24,16 @@ appId: com.omarelkhatib.superstarpt
     id: btn-add-session
 - scrollUntilVisible:
     element:
-      id: joint-cell-ankle
+      id: btn-open-visualization
     direction: DOWN
+- tapOn:
+    id: btn-open-visualization
 - assertVisible:
-    id: joint-cell-ankle
+    id: view-joint-load-visualization
+- assertVisible:
+    id: chart-shared-axis
+- tapOn:
+    id: btn-view-load-map
 - scrollUntilVisible:
     element:
       id: btn-toggle-history

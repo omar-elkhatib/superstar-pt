@@ -125,6 +125,23 @@ export function buildSimctlShutdownArgs(udid) {
   return ["simctl", "shutdown", udid];
 }
 
+export function isSimctlBootAlreadySatisfiedError(output) {
+  const value = output || "";
+  return (
+    /Unable to boot device in current state:\s*(Booted|Booting)/i.test(value) ||
+    /already booted/i.test(value)
+  );
+}
+
+export function isOsascriptUserCanceledError(output) {
+  const value = output || "";
+  return /User canceled\.\s*\(-128\)/i.test(value);
+}
+
+export function shouldIgnoreLingeringSimulatorFailure({ env = {}, osascriptOutput = "" } = {}) {
+  return Boolean(env.CI) && isOsascriptUserCanceledError(osascriptOutput);
+}
+
 export function buildKillallSimulatorArgs() {
   return ["Simulator"];
 }

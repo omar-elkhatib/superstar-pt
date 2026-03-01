@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import {
   buildKillallSimulatorArgs,
+  isOsascriptUserCanceledError,
+  shouldIgnoreLingeringSimulatorFailure,
   buildSimctlShutdownArgs,
   buildSimctlTerminateArgs,
   DEFAULT_SIMULATOR_NAME,
@@ -72,10 +74,14 @@ function quitSimulatorApp() {
     }
   };
 
+  let osascriptOutput = "";
   try {
-    run("osascript", ["-e", 'tell application "Simulator" to quit']);
-  } catch {
-    // Ignore failures in headless contexts and fallback to killall.
+    run("osascript", ["-e", 'tell application "Simulator" to quit'], { capture: true });
+  } catch (error) {
+    osascriptOutput = combinedOutput(error);
+    if (!isOsascriptUserCanceledError(osascriptOutput)) {
+      console.warn("Unable to quit Simulator via osascript. Falling back to killall.");
+    }
   }
 
   if (simulatorStillRunning()) {
@@ -90,6 +96,10 @@ function quitSimulatorApp() {
   }
 
   if (simulatorStillRunning()) {
+    if (shouldIgnoreLingeringSimulatorFailure({ env: process.env, osascriptOutput })) {
+      console.warn("Simulator process is still running in CI after osascript cancellation; continuing.");
+      return;
+    }
     throw new Error("Simulator process is still running after teardown.");
   }
 

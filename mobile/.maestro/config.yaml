@@ -1,1 +1,4 @@
 appId: com.omarelkhatib.superstarpt
+flows:
+  - adaptive-checkin-load-map.yaml
+  - features/**/*.yaml

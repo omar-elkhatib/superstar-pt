@@ -36,6 +36,82 @@ This runs:
 
 If this command passes, your app is in a much safer state before scanning on a device.
 
+### Development Verification Loop (recommended)
+
+Use this short loop while building features:
+
+1. Fast logic checks before coding and after each change:
+```bash
+npm test
+npm run mobile:test
+```
+2. Full mobile preflight before manual QA:
+```bash
+npm run mobile:verify
+```
+3. Interactive iOS simulator run:
+```bash
+npm run ios:run
+```
+4. Automated UI flow + screenshots (for regression checks and design review):
+```bash
+npm run ios:maestro:test
+```
+5. Review generated screenshots:
+- `mobile/.derived-data/maestro/core/artifacts/screenshots`
+- `mobile/.derived-data/maestro/features/artifacts/screenshots`
+
+If the simulator shows `No script URL provided`, start Metro and relaunch:
+```bash
+npm run mobile:start
+npm run ios:run
+```
+
+### Feature UI Tests (Reusable Maestro Harness)
+
+Use one reusable feature runner that always does:
+
+1. `ios:maestro:prepare`
+2. Run one Maestro feature flow
+3. `ios:maestro:teardown` (always, even on failure)
+
+For full E2E (`npm run e2e:maestro`), setup/build happens once and the suite runs all flows in one pass via `mobile/.maestro/config.yaml`:
+
+1. `adaptive-checkin-load-map.yaml`
+2. `features/**/*.yaml`
+
+This avoids rebuilding/rebooting simulator per feature flow.
+
+Run the joint load visualization feature test:
+
+```bash
+npm run ios:maestro:test:joint-load
+```
+
+Joint-load flow path (stable, no scroll dependency):
+
+1. Open `Load Map`
+2. Tap `Add session`
+3. Open `Visualization`
+4. Assert chart + risk legend IDs
+
+Run any feature flow with the same setup/teardown:
+
+```bash
+npm run ios:maestro:test:feature -- mobile/.maestro/features/<feature-name>.yaml
+```
+
+Feature artifacts are written to:
+
+- `mobile/.derived-data/maestro/features/<feature-name>/`
+
+For new feature UI flows, prefer:
+
+1. Dedicated view/screen for the feature being tested
+2. Stable `testID` selectors instead of text/position selectors
+3. Flow assertions scoped to that feature view only
+4. Shared Maestro fixtures with `runFlow` (for example `fixtures/session-start.yaml`)
+
 ### iOS Simulator E2E with Maestro
 
 Prerequisites:
@@ -46,6 +122,18 @@ sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 ```
 2. iOS simulator runtime available (`xcrun simctl list devices` should work).
 3. Java 17+ available (`java -version`).
+   If your shell cannot find Java 17 by default, add this once to `~/.zshrc` or `~/.bashrc`:
+```bash
+# Maestro/Android tooling requires Java 17 on PATH
+if [ -d "/opt/homebrew/opt/openjdk@17/bin" ]; then
+  export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
+elif [ -d "/usr/local/opt/openjdk@17/bin" ]; then
+  export PATH="/usr/local/opt/openjdk@17/bin:$PATH"
+fi
+
+export JAVA_HOME="$(/usr/libexec/java_home -v 17 2>/dev/null || true)"
+```
+   Then restart your shell (or run `source ~/.zshrc` / `source ~/.bashrc`) and re-check with `java -version`.
 4. Maestro CLI installed:
 ```bash
 curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -62,6 +150,9 @@ This command now runs `prepare -> test -> teardown`, so the simulator app sessio
 Current flow file:
 
 - `mobile/.maestro/adaptive-checkin-load-map.yaml`
+- `mobile/.maestro/features/joint-load-visualization.yaml`
+- `mobile/.maestro/fixtures/session-start.yaml`
+- `mobile/.maestro/fixtures/load-map-add-session.yaml`
 
 ### Build a downloadable iOS app (TestFlight/internal)
 
@@ -137,7 +228,9 @@ After build completes, install using the provided link/TestFlight.
 - `npm run test:all`: run root tests and mobile tests together
 - `npm run ios:run`: build and launch app in iOS simulator
 - `npm run ios:maestro:prepare`: install pods, build Release simulator app, install + launch app
-- `npm run ios:maestro:test`: run Maestro flows and write artifacts to `mobile/.derived-data/maestro`
+- `npm run ios:maestro:test`: run Maestro `core` + `features` suites and write artifacts to `mobile/.derived-data/maestro/{core,features}`
+- `npm run ios:maestro:test:feature`: reusable feature runner (`prepare -> feature flow -> teardown`)
+- `npm run ios:maestro:test:joint-load`: joint-load visualization feature UI test
 - `npm run ios:maestro:teardown`: terminate app + shutdown simulator + close Simulator app
 - `npm run e2e:maestro`: run `ios:maestro:prepare`, `ios:maestro:test`, and always `ios:maestro:teardown`
 

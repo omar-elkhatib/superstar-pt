@@ -4,6 +4,9 @@ import {
   buildReleaseBuildArgs,
   buildReleaseAppPath,
   buildKillallSimulatorArgs,
+  isOsascriptUserCanceledError,
+  isSimctlBootAlreadySatisfiedError,
+  shouldIgnoreLingeringSimulatorFailure,
   buildSimctlShutdownArgs,
   buildSimctlTerminateArgs,
   buildExpoRunArgs,
@@ -126,6 +129,45 @@ test("buildSimctlTerminateArgs targets specific simulator + bundle", () => {
 test("buildSimctlShutdownArgs targets specific simulator", () => {
   const args = buildSimctlShutdownArgs("DEVICE-UDID");
   assert.deepEqual(args, ["simctl", "shutdown", "DEVICE-UDID"]);
+});
+
+test("isSimctlBootAlreadySatisfiedError detects already-booted simulator output", () => {
+  const output = `
+    An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+    Unable to boot device in current state: Booted
+  `;
+  assert.equal(isSimctlBootAlreadySatisfiedError(output), true);
+});
+
+test("isSimctlBootAlreadySatisfiedError ignores unrelated simctl errors", () => {
+  const output = "An error was encountered processing the command: Device not found";
+  assert.equal(isSimctlBootAlreadySatisfiedError(output), false);
+});
+
+test("isOsascriptUserCanceledError detects headless Simulator quit cancellation", () => {
+  const output = "32:36: execution error: Simulator got an error: User canceled. (-128)";
+  assert.equal(isOsascriptUserCanceledError(output), true);
+});
+
+test("isOsascriptUserCanceledError ignores unrelated osascript failures", () => {
+  const output = "execution error: Application isn't running. (-600)";
+  assert.equal(isOsascriptUserCanceledError(output), false);
+});
+
+test("shouldIgnoreLingeringSimulatorFailure allows CI teardown to continue on osascript cancel", () => {
+  const result = shouldIgnoreLingeringSimulatorFailure({
+    env: { CI: "true" },
+    osascriptOutput: "execution error: Simulator got an error: User canceled. (-128)"
+  });
+  assert.equal(result, true);
+});
+
+test("shouldIgnoreLingeringSimulatorFailure keeps local teardown strict", () => {
+  const result = shouldIgnoreLingeringSimulatorFailure({
+    env: {},
+    osascriptOutput: "execution error: Simulator got an error: User canceled. (-128)"
+  });
+  assert.equal(result, false);
 });
 
 test("buildKillallSimulatorArgs targets Simulator process", () => {

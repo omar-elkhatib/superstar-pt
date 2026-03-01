@@ -1,0 +1,8 @@
+appId: com.omarelkhatib.superstarpt
+---
+- tapOn:
+    id: btn-view-load-map
+- assertVisible:
+    id: btn-add-session
+- tapOn:
+    id: btn-add-session
