@@ -17,10 +17,10 @@
 4. Run both root + mobile tests together when needed: `npm run test:all`
 5. Before iOS simulator tests, verify tooling: `xcodebuild -version && xcrun simctl list devices && pod --version`
 6. Run iOS simulator unit-test validation to completion: `cd mobile/ios && xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.derived-data -only-testing:SuperstarPTTests`
-7. Run automated iOS UI interaction + screenshots: `npm run ios:test:ui` (Release simulator run, no Metro required)
-8. Export latest UI test screenshots to PNG files: `npm run ios:test:ui:extract` (writes to `mobile/.derived-data/ui-screenshots/<xcresult-name>/`)
-9. Run interactive simulator app launch validation: `npm run ios:run` and confirm it reports `Verified app launch: <bundle-id> (pid <number>)`.
-10. Print latest artifact locations for quick access: `npm run ios:test:artifacts`
+7. Run iOS Maestro E2E session end-to-end: `npm run e2e:maestro` (prepare, test, teardown)
+8. Run Maestro prepare only: `npm run ios:maestro:prepare`
+9. Run Maestro test only: `npm run ios:maestro:test`
+10. Run Maestro teardown only: `npm run ios:maestro:teardown`
 
 ## Network Access Policy
 

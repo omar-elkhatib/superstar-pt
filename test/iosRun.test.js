@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildReleaseBuildArgs,
+  buildReleaseAppPath,
+  buildKillallSimulatorArgs,
+  buildSimctlShutdownArgs,
+  buildSimctlTerminateArgs,
   buildExpoRunArgs,
   parseLaunchPid,
   readBundleIdentifier,
@@ -78,4 +83,52 @@ test("buildExpoRunArgs configures no-bundler device run", () => {
     "iPhone 17",
     "--no-bundler"
   ]);
+});
+
+test("buildReleaseBuildArgs configures release simulator build", () => {
+  const args = buildReleaseBuildArgs("iPhone 17");
+  assert.deepEqual(args, [
+    "build",
+    "-workspace",
+    "SuperstarPT.xcworkspace",
+    "-scheme",
+    "SuperstarPT",
+    "-configuration",
+    "Release",
+    "-destination",
+    "platform=iOS Simulator,name=iPhone 17",
+    "-derivedDataPath",
+    "../.derived-data"
+  ]);
+});
+
+test("buildReleaseAppPath points to release simulator app artifact", () => {
+  const fullPath = buildReleaseAppPath("/repo/root");
+  assert.equal(
+    fullPath,
+    path.join(
+      "/repo/root",
+      "mobile",
+      ".derived-data",
+      "Build",
+      "Products",
+      "Release-iphonesimulator",
+      "SuperstarPT.app"
+    )
+  );
+});
+
+test("buildSimctlTerminateArgs targets specific simulator + bundle", () => {
+  const args = buildSimctlTerminateArgs("DEVICE-UDID", "com.example.app");
+  assert.deepEqual(args, ["simctl", "terminate", "DEVICE-UDID", "com.example.app"]);
+});
+
+test("buildSimctlShutdownArgs targets specific simulator", () => {
+  const args = buildSimctlShutdownArgs("DEVICE-UDID");
+  assert.deepEqual(args, ["simctl", "shutdown", "DEVICE-UDID"]);
+});
+
+test("buildKillallSimulatorArgs targets Simulator process", () => {
+  const args = buildKillallSimulatorArgs();
+  assert.deepEqual(args, ["Simulator"]);
 });

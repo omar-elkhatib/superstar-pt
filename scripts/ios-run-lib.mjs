@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 
 export const DEFAULT_SIMULATOR_NAME = "iPhone 17";
 
@@ -86,4 +87,44 @@ export function readBundleIdentifier(appJsonPath) {
 
 export function buildExpoRunArgs(deviceName) {
   return ["--prefix", "mobile", "run", "ios:run:expo", "--", "--device", deviceName, "--no-bundler"];
+}
+
+export function buildReleaseBuildArgs(deviceName) {
+  return [
+    "build",
+    "-workspace",
+    "SuperstarPT.xcworkspace",
+    "-scheme",
+    "SuperstarPT",
+    "-configuration",
+    "Release",
+    "-destination",
+    `platform=iOS Simulator,name=${deviceName}`,
+    "-derivedDataPath",
+    "../.derived-data"
+  ];
+}
+
+export function buildReleaseAppPath(repoRoot) {
+  return path.join(
+    repoRoot,
+    "mobile",
+    ".derived-data",
+    "Build",
+    "Products",
+    "Release-iphonesimulator",
+    "SuperstarPT.app"
+  );
+}
+
+export function buildSimctlTerminateArgs(udid, bundleId) {
+  return ["simctl", "terminate", udid, bundleId];
+}
+
+export function buildSimctlShutdownArgs(udid) {
+  return ["simctl", "shutdown", udid];
+}
+
+export function buildKillallSimulatorArgs() {
+  return ["Simulator"];
 }
