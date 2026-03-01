@@ -36,31 +36,6 @@ This runs:
 
 If this command passes, your app is in a much safer state before scanning on a device.
 
-### iOS Simulator UI feedback loop (Xcode)
-
-1. Start Metro (required for interactive React Native UI in simulator):
-```bash
-npm run mobile:start
-```
-2. In another terminal, launch simulator app for manual interaction:
-```bash
-npm run ios:run
-```
-Expected success signal: terminal prints `Verified app launch: <bundle-id> (pid <number>)`.
-3. Run automated UI interactions + screenshots:
-```bash
-npm run ios:test:ui
-```
-4. Open screenshot artifacts from the generated bundle:
-`mobile/.derived-data/UIFeedback-release-<timestamp>.xcresult`
-
-Note: `[libapp_launch_measurement.dylib] Failed to send CA Event...` lines are simulator telemetry warnings and are non-fatal if the app continues to bundle and render.
-
-To print the latest artifact locations quickly:
-```bash
-npm run ios:test:artifacts
-```
-
 ### iOS Simulator E2E with Maestro
 
 Prerequisites:
@@ -161,7 +136,6 @@ After build completes, install using the provided link/TestFlight.
 - `npm run mobile:verify`: run mobile tests + Expo config + iOS bundle export
 - `npm run test:all`: run root tests and mobile tests together
 - `npm run ios:run`: build and launch app in iOS simulator
-- `npm run ios:test:ui`: run XCUITest UI flow and store screenshots in `.xcresult`
 - `npm run ios:maestro:prepare`: install pods, build Release simulator app, install + launch app
 - `npm run ios:maestro:test`: run Maestro flows and write artifacts to `mobile/.derived-data/maestro`
 - `npm run ios:maestro:teardown`: terminate app + shutdown simulator + close Simulator app
