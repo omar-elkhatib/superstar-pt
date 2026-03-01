@@ -22,7 +22,8 @@
     "ios:test:artifacts": "node scripts/ios-test-artifacts.mjs",
     "ios:maestro:prepare": "node scripts/ios-maestro-prepare.mjs",
     "ios:maestro:test": "maestro -p ios test mobile/.maestro --format junit --output mobile/.derived-data/maestro/results.xml --test-output-dir mobile/.derived-data/maestro/artifacts --debug-output mobile/.derived-data/maestro/debug --flatten-debug-output",
-    "e2e:maestro": "npm run ios:maestro:prepare && npm run ios:maestro:test"
+    "ios:maestro:teardown": "node scripts/ios-maestro-teardown.mjs",
+    "e2e:maestro": "node scripts/ios-maestro-session.mjs"
   },
   "keywords": [
     "physiotherapy",

@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
   buildReleaseBuildArgs,
   buildReleaseAppPath,
+  buildKillallSimulatorArgs,
+  buildSimctlShutdownArgs,
+  buildSimctlTerminateArgs,
   buildExpoRunArgs,
   parseLaunchPid,
   readBundleIdentifier,
@@ -113,4 +116,19 @@ test("buildReleaseAppPath points to release simulator app artifact", () => {
       "SuperstarPT.app"
     )
   );
+});
+
+test("buildSimctlTerminateArgs targets specific simulator + bundle", () => {
+  const args = buildSimctlTerminateArgs("DEVICE-UDID", "com.example.app");
+  assert.deepEqual(args, ["simctl", "terminate", "DEVICE-UDID", "com.example.app"]);
+});
+
+test("buildSimctlShutdownArgs targets specific simulator", () => {
+  const args = buildSimctlShutdownArgs("DEVICE-UDID");
+  assert.deepEqual(args, ["simctl", "shutdown", "DEVICE-UDID"]);
+});
+
+test("buildKillallSimulatorArgs targets Simulator process", () => {
+  const args = buildKillallSimulatorArgs();
+  assert.deepEqual(args, ["Simulator"]);
 });

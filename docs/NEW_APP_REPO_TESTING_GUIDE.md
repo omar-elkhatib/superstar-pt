@@ -78,6 +78,12 @@ Run migrated iOS Maestro flow:
 npm run e2e:maestro
 ```
 
+Teardown only (if you need to close simulator/app session manually):
+
+```bash
+npm run ios:maestro:teardown
+```
+
 ## 6) Common setup failures
 
 - `Project is incompatible with this version of Expo Go`:

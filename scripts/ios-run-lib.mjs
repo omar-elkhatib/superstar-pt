@@ -116,3 +116,15 @@ export function buildReleaseAppPath(repoRoot) {
     "SuperstarPT.app"
   );
 }
+
+export function buildSimctlTerminateArgs(udid, bundleId) {
+  return ["simctl", "terminate", udid, bundleId];
+}
+
+export function buildSimctlShutdownArgs(udid) {
+  return ["simctl", "shutdown", udid];
+}
+
+export function buildKillallSimulatorArgs() {
+  return ["Simulator"];
+}

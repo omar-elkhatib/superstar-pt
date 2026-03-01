@@ -82,6 +82,8 @@ Run flow:
 npm run e2e:maestro
 ```
 
+This command now runs `prepare -> test -> teardown`, so the simulator app session is closed when the run finishes.
+
 Current flow file:
 
 - `mobile/.maestro/adaptive-checkin-load-map.yaml`
@@ -162,7 +164,8 @@ After build completes, install using the provided link/TestFlight.
 - `npm run ios:test:ui`: run XCUITest UI flow and store screenshots in `.xcresult`
 - `npm run ios:maestro:prepare`: install pods, build Release simulator app, install + launch app
 - `npm run ios:maestro:test`: run Maestro flows and write artifacts to `mobile/.derived-data/maestro`
-- `npm run e2e:maestro`: run `ios:maestro:prepare` followed by `ios:maestro:test`
+- `npm run ios:maestro:teardown`: terminate app + shutdown simulator + close Simulator app
+- `npm run e2e:maestro`: run `ios:maestro:prepare`, `ios:maestro:test`, and always `ios:maestro:teardown`
 
 ## Initial architecture
 
