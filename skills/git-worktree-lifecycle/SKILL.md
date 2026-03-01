@@ -23,10 +23,11 @@ Require user confirmation before force-removing dirty worktrees.
 
 ## Worktree Location Policy
 
-Place worktrees adjacent to the repository in a sibling directory, not inside the repo and not under `.git`.
+Place worktrees outside the repository in a sibling directory, not inside the repo and not under `.git`.
+If the repo is `/Users/omarelkhatib/Sandbox/superstar-pt`, a valid worktree path is `/Users/omarelkhatib/Sandbox/<worktree-name>` (for example, `/Users/omarelkhatib/Sandbox/my-worktree`).
 
-- Preferred root: `../wt/`
-- Example path: `../wt/<new-branch>`
+- Preferred root: `../<worktree-name>` (repo sibling)
+- Example path: `../my-worktree`
 - Reject paths like `.worktrees/<name>` or `.git/...` unless the user explicitly asks for that location.
 
 ## List or Get Worktrees
@@ -50,7 +51,7 @@ git worktree list --porcelain | rg "branch refs/heads/<branch-name>|worktree "
 2. Require explicit branch name from the user; do not invent one unless asked.
 3. Default the worktree to a sibling directory when values are missing:
 `base_branch=main`
-`worktree_path=../wt/<new-branch>`
+`worktree_path=../<new-branch>`
 4. Create the worktree and branch:
 
 ```bash
