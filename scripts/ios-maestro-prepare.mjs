@@ -5,6 +5,7 @@ import {
   buildReleaseAppPath,
   buildReleaseBuildArgs,
   DEFAULT_SIMULATOR_NAME,
+  isSimctlBootAlreadySatisfiedError,
   parseLaunchPid,
   readBundleIdentifier,
   selectSimulatorDevice
@@ -29,6 +30,10 @@ function getSimctlListJson() {
   return JSON.parse(output);
 }
 
+function combinedOutput(error) {
+  return `${error?.stdout || ""}\n${error?.stderr || ""}\n${error?.message || ""}`;
+}
+
 function ensureSimulatorOpenAndBooted(udid) {
   try {
     run("open", ["-a", "Simulator", "--args", "-CurrentDeviceUDID", udid]);
@@ -46,7 +51,13 @@ function ensureSimulatorOpenAndBooted(udid) {
   })();
 
   if (!isAlreadyBooted) {
-    run("xcrun", ["simctl", "boot", udid]);
+    try {
+      run("xcrun", ["simctl", "boot", udid], { capture: true });
+    } catch (error) {
+      if (!isSimctlBootAlreadySatisfiedError(combinedOutput(error))) {
+        throw error;
+      }
+    }
   }
 
   run("xcrun", ["simctl", "bootstatus", udid, "-b"]);

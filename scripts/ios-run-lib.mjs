@@ -125,6 +125,14 @@ export function buildSimctlShutdownArgs(udid) {
   return ["simctl", "shutdown", udid];
 }
 
+export function isSimctlBootAlreadySatisfiedError(output) {
+  const value = output || "";
+  return (
+    /Unable to boot device in current state:\s*(Booted|Booting)/i.test(value) ||
+    /already booted/i.test(value)
+  );
+}
+
 export function buildKillallSimulatorArgs() {
   return ["Simulator"];
 }

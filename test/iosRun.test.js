@@ -4,6 +4,7 @@ import {
   buildReleaseBuildArgs,
   buildReleaseAppPath,
   buildKillallSimulatorArgs,
+  isSimctlBootAlreadySatisfiedError,
   buildSimctlShutdownArgs,
   buildSimctlTerminateArgs,
   buildExpoRunArgs,
@@ -126,6 +127,19 @@ test("buildSimctlTerminateArgs targets specific simulator + bundle", () => {
 test("buildSimctlShutdownArgs targets specific simulator", () => {
   const args = buildSimctlShutdownArgs("DEVICE-UDID");
   assert.deepEqual(args, ["simctl", "shutdown", "DEVICE-UDID"]);
+});
+
+test("isSimctlBootAlreadySatisfiedError detects already-booted simulator output", () => {
+  const output = `
+    An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+    Unable to boot device in current state: Booted
+  `;
+  assert.equal(isSimctlBootAlreadySatisfiedError(output), true);
+});
+
+test("isSimctlBootAlreadySatisfiedError ignores unrelated simctl errors", () => {
+  const output = "An error was encountered processing the command: Device not found";
+  assert.equal(isSimctlBootAlreadySatisfiedError(output), false);
 });
 
 test("buildKillallSimulatorArgs targets Simulator process", () => {
