@@ -29,7 +29,11 @@ Collect or infer:
 - `head_branch` (current branch unless user says otherwise)
 - `base_branch` (default: `main`)
 - PR title
-- PR body or summary bullets
+- PR body content aligned to template sections:
+  - `### Motivation`
+  - `### Changes`
+  - `### Testing`
+  - visual evidence note when relevant
 
 Use these checks:
 
@@ -48,10 +52,16 @@ If there are uncommitted changes, ask before creating the PR.
 git push -u origin <head_branch>
 ```
 
-2. Create the PR:
+2. Build PR body from template:
+
+- If `.github/pull_request_template.md` exists, use it as the required scaffold.
+- Fill each section with the gathered content before creating the PR.
+- Keep the template headings unchanged.
+
+3. Create the PR with a body file:
 
 ```bash
-gh pr create --base <base_branch> --head <head_branch> --title "<title>" --body "<body>"
+gh pr create --base <base_branch> --head <head_branch> --title "<title>" --body-file <path_to_filled_template>
 ```
 
 Use `--draft` when requested.
