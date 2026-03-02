@@ -28,3 +28,12 @@
 2. For any networked or escalated command (for example `npm install`, `npx`, `git push`, `git pull`, `curl`, `brew`), use Codex's built-in permission request flow directly.
 3. Do not pause to ask the user for manual yes/no in chat before requesting tool permission.
 4. Request one-time approval only for networked commands; do not request or rely on persistent approval rules.
+
+## GitHub CLI in Codex
+
+1. Authenticate in your host terminal first: `gh auth login -h github.com`.
+2. In Codex, run `gh` commands with elevated permissions so host keychain + network access are available.
+3. Use one-time approval for each networked `gh` command.
+4. Verify auth before PR actions: `gh auth status -h github.com` and `gh api user -q .login`.
+5. Create PRs from a branch ahead of `main`: `gh pr create --base main --head <branch> --draft --fill`.
+6. If `gh` reports invalid token without elevation, rerun the same command with elevated permissions.
