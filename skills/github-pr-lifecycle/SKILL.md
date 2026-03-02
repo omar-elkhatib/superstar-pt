@@ -29,6 +29,7 @@ Collect or infer:
 - `head_branch` (current branch unless user says otherwise)
 - `base_branch` (default: `main`)
 - PR title
+- PR visibility intent (default: draft; open only when user explicitly asks)
 - PR body content aligned to template sections:
   - `### Motivation`
   - `### Changes`
@@ -61,10 +62,16 @@ git push -u origin <head_branch>
 3. Create the PR with a body file:
 
 ```bash
-gh pr create --base <base_branch> --head <head_branch> --title "<title>" --body-file <path_to_filled_template>
+gh pr create --base <base_branch> --head <head_branch> --title "<title>" --body-file <path_to_filled_template> --draft
 ```
 
-Use `--draft` when requested.
+Default to draft PR creation.
+Create an open PR only when the user explicitly asks to open it for review.
+If needed, convert an existing draft to open with:
+
+```bash
+gh pr ready
+```
 
 ## Inspect PR Status
 
