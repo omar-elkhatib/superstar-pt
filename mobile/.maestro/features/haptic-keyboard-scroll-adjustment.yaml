@@ -1,0 +1,19 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- scrollUntilVisible:
+    element:
+      id: btn-feedback-joint-shoulder
+    direction: DOWN
+- tapOn:
+    id: btn-feedback-joint-shoulder
+- scrollUntilVisible:
+    element:
+      id: input-joint-feedback
+    direction: DOWN
+- tapOn:
+    id: input-joint-feedback
+- inputText: "7"
+- assertVisible:
+    id: input-joint-feedback
+- takeScreenshot: haptic_keyboard_scroll_adjustment

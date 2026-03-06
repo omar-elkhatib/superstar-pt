@@ -1,7 +1,13 @@
 appId: com.omarelkhatib.superstarpt
 ---
 - runFlow: ../fixtures/session-start.yaml
+- assertVisible:
+    id: card-add-session
 - runFlow: ../fixtures/load-map-add-session.yaml
+- scrollUntilVisible:
+    element:
+      id: btn-view-visualization
+    direction: DOWN
 - tapOn:
     id: btn-view-visualization
 - assertVisible:

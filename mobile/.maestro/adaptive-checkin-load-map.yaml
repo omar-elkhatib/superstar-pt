@@ -1,44 +1,40 @@
 appId: com.omarelkhatib.superstarpt
 ---
 - runFlow: fixtures/session-start.yaml
-- takeScreenshot: home
-- tapOn:
-    id: btn-readiness-high
 - assertVisible:
-    id: result-action-label
-- assertVisible: "Action: progress"
-- takeScreenshot: after_high_readiness
-- swipe:
-    direction: UP
-- takeScreenshot: after_swipe
-- tapOn:
-    id: btn-view-load-map
-- scrollUntilVisible:
-    element:
-      id: btn-add-session
-    direction: DOWN
+    id: card-session-browser
+- assertVisible:
+    id: card-add-session
+- assertVisible:
+    id: input-session-pain
+- takeScreenshot: home_session_browser
 - assertVisible:
     id: btn-add-session
-- takeScreenshot: load_map
 - tapOn:
     id: btn-add-session
+- assertVisible:
+    id: feedback-banner
+- takeScreenshot: add_session_overlay_banner
+- assertVisible:
+    id: session-browser-count
+- assertVisible: 1 saved
+- assertVisible:
+    id: session-detail-card
 - scrollUntilVisible:
     element:
-      id: btn-open-visualization
+      id: btn-view-visualization
     direction: DOWN
 - tapOn:
-    id: btn-open-visualization
+    id: btn-view-visualization
 - assertVisible:
     id: view-joint-load-visualization
 - assertVisible:
     id: chart-shared-axis
+- takeScreenshot: load_map_visualization
 - tapOn:
-    id: btn-view-load-map
-- scrollUntilVisible:
-    element:
-      id: btn-toggle-history
-    direction: DOWN
-- tapOn:
-    id: btn-toggle-history
-- assertVisible: Exercise History
-- takeScreenshot: load_map_history
+    id: btn-view-main
+- assertVisible:
+    id: card-session-browser
+- assertVisible:
+    id: card-add-session
+- takeScreenshot: back_to_main_layout

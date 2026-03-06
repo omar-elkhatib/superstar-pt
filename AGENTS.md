@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## UI Verification Requirement (Top-Level)
+
+1. For any UI-impacting change, include screenshot-based verification checks (iOS simulator screenshots and/or Maestro screenshot assertions) to confirm the UI behaves and renders as intended before completion.
+
 ## Engineering Workflow Rules
 
 1. Run the test suite before starting any implementation work.

@@ -456,6 +456,26 @@ export function updateToleranceFromFeedback({ toleranceState, entries, asOfIso }
   return next;
 }
 
+export function rebuildToleranceStateFromEntries({ entries = [] }) {
+  const chronologicalEntries = [...entries]
+    .filter((entry) => Number.isFinite(Date.parse(entry?.performedAtIso)))
+    .sort((a, b) => Date.parse(a.performedAtIso) - Date.parse(b.performedAtIso));
+
+  let toleranceState = createDefaultToleranceState();
+  const replayedEntries = [];
+
+  for (const entry of chronologicalEntries) {
+    replayedEntries.push(entry);
+    toleranceState = updateToleranceFromFeedback({
+      toleranceState,
+      entries: replayedEntries,
+      asOfIso: entry.performedAtIso
+    });
+  }
+
+  return toleranceState;
+}
+
 export function buildAdaptiveRecommendation({ baseRecommendation, loadSummary }) {
   const topJoint = loadSummary?.topStressedJoints?.[0]?.jointId || "joint";
 

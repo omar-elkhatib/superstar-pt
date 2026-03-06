@@ -47,6 +47,12 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     return saved;
   }
 
+  function deleteEntry(entryId) {
+    const remaining = getEntries().filter((entry) => entry.id !== entryId);
+    setEntries(remaining);
+    return remaining;
+  }
+
   function getToleranceState() {
     return parseOrFallback(storage.getItem(TOLERANCE_KEY), createDefaultToleranceState());
   }
@@ -68,6 +74,7 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     getEntries,
     setEntries,
     addEntry,
+    deleteEntry,
     getToleranceState,
     setToleranceState,
     getTemplates,

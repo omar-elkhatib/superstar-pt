@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createDefaultToleranceState,
+  rebuildToleranceStateFromEntries,
   updateToleranceFromFeedback
 } from "../src/loadModel.mjs";
 
@@ -62,4 +63,22 @@ test("tolerance updates are limited to once per 7 days", () => {
   });
 
   assert.equal(next.factors.knee, 0.85);
+});
+
+test("rebuildToleranceStateFromEntries replays weekly feedback in chronological order", () => {
+  const rebuilt = rebuildToleranceStateFromEntries({
+    entries: [
+      {
+        performedAtIso: "2026-02-01T10:00:00.000Z",
+        jointFeedback: { knee: 1 }
+      },
+      {
+        performedAtIso: "2026-02-10T10:00:00.000Z",
+        jointFeedback: { knee: 8 }
+      }
+    ]
+  });
+
+  assert.equal(rebuilt.factors.knee, 0.8);
+  assert.equal(rebuilt.lastUpdatedIso.knee, "2026-02-10T10:00:00.000Z");
 });

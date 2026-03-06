@@ -1,0 +1,59 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- assertVisible:
+    id: card-session-browser
+- assertVisible:
+    id: card-add-session
+- scrollUntilVisible:
+    element:
+      id: btn-add-session
+    direction: DOWN
+- tapOn:
+    id: btn-add-session
+- tapOn:
+    id: btn-add-session
+- tapOn:
+    id: btn-add-session
+- scrollUntilVisible:
+    element:
+      id: session-browser-title
+    direction: DOWN
+- assertVisible:
+    id: session-browser-title
+- assertVisible:
+    id: session-browser-count
+- assertVisible: 3 saved
+- assertVisible:
+    id: btn-session-row-0
+- assertVisible:
+    id: btn-session-row-1
+- assertVisible:
+    id: btn-session-row-2
+- assertVisible:
+    id: session-detail-card
+- tapOn:
+    id: btn-session-row-1
+- tapOn:
+    id: btn-delete-selected-session
+- assertVisible:
+    id: session-browser-count
+- assertVisible: 2 saved
+- assertVisible:
+    id: btn-session-row-0
+- assertVisible:
+    id: btn-session-row-1
+- assertNotVisible:
+    id: btn-session-row-2
+- tapOn:
+    id: btn-session-row-1
+- tapOn:
+    id: btn-delete-selected-session
+- assertVisible:
+    id: session-browser-count
+- assertVisible: 1 saved
+- assertVisible:
+    id: btn-session-row-0
+- assertNotVisible:
+    id: btn-session-row-1
+- takeScreenshot: haptic_session_browser_manage

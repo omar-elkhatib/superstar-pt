@@ -1,0 +1,16 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- assertVisible:
+    id: card-session-browser
+- assertVisible:
+    id: session-browser-title
+- assertVisible:
+    id: session-browser-count
+- scrollUntilVisible:
+    element:
+      id: input-session-pain
+    direction: DOWN
+- assertVisible:
+    id: input-session-pain
+- takeScreenshot: haptic_hidden_section_reveal

@@ -1,8 +1,8 @@
 appId: com.omarelkhatib.superstarpt
 ---
-- tapOn:
-    id: btn-view-load-map
-- assertVisible:
-    id: btn-add-session
+- scrollUntilVisible:
+    element:
+      id: btn-add-session
+    direction: DOWN
 - tapOn:
     id: btn-add-session

@@ -32,6 +32,79 @@ test("history store persists entries and tolerance state", () => {
   assert.equal(store2.getToleranceState().factors.knee, 0.8);
 });
 
+test("history store persists deleted entries across reloads", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  store.addEntry({
+    id: "older",
+    templateId: "walking",
+    performedAtIso: "2026-02-27T10:00:00.000Z",
+    durationMinutes: 20,
+    effortScore: 4,
+    variant: "base"
+  });
+  store.addEntry({
+    id: "newer",
+    templateId: "cycling",
+    performedAtIso: "2026-02-28T10:00:00.000Z",
+    durationMinutes: 30,
+    effortScore: 5,
+    variant: "seated"
+  });
+
+  const remaining = store.deleteEntry("newer");
+  const store2 = createHistoryStore(storage);
+
+  assert.deepEqual(
+    remaining.map((entry) => entry.id),
+    ["older"]
+  );
+  assert.deepEqual(
+    store2.getEntries().map((entry) => entry.id),
+    ["older"]
+  );
+});
+
+test("history store supports deleting multiple entries in sequence", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  store.addEntry({
+    id: "session-1",
+    templateId: "walking",
+    performedAtIso: "2026-02-27T10:00:00.000Z",
+    durationMinutes: 20,
+    effortScore: 4,
+    variant: "base"
+  });
+  store.addEntry({
+    id: "session-2",
+    templateId: "cycling",
+    performedAtIso: "2026-02-28T10:00:00.000Z",
+    durationMinutes: 30,
+    effortScore: 5,
+    variant: "seated"
+  });
+  store.addEntry({
+    id: "session-3",
+    templateId: "rowing",
+    performedAtIso: "2026-03-01T10:00:00.000Z",
+    durationMinutes: 25,
+    effortScore: 6,
+    variant: "supported"
+  });
+
+  store.deleteEntry("session-2");
+  store.deleteEntry("session-3");
+
+  const reloadedStore = createHistoryStore(storage);
+  assert.deepEqual(
+    reloadedStore.getEntries().map((entry) => entry.id),
+    ["session-1"]
+  );
+});
+
 test("rolling summary excludes entries older than 14 days", () => {
   const storage = createMemoryStorage();
   const store = createHistoryStore(storage);

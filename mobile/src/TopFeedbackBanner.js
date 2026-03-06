@@ -31,7 +31,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderWidth: 1
+    borderWidth: 1,
+    shadowColor: "#082315",
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4
   },
   bannerSuccess: {
     backgroundColor: "#e7f7ed",

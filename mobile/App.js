@@ -1,11 +1,12 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Keyboard,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View
@@ -24,12 +25,20 @@ import {
   computeEntryJointLoad,
   createDefaultToleranceState,
   JOINT_IDS,
+  rebuildToleranceStateFromEntries,
   selectTopJointSeries,
   summarizeRollingLoad,
   updateToleranceFromFeedback
 } from "./src/loadModel.mjs";
+import {
+  deleteSessionById,
+  resolveSelectedSessionId
+} from "./src/sessionBrowser.mjs";
+import {
+  computeKeyboardAwareScrollOffset,
+  computeRevealScrollOffset
+} from "./src/scrollBehavior.mjs";
 
-const READINESS_OPTIONS = ["low", "medium", "high"];
 const VARIANT_OPTIONS = ["base", "seated", "supported"];
 const LOAD_WINDOW_DAYS = 14;
 const JOINT_SERIES_COLORS = {
@@ -88,12 +97,59 @@ function formatLoadValue(value) {
   return value.toFixed(1);
 }
 
+function formatPerformedAt(performedAtIso) {
+  const performedAt = Date.parse(performedAtIso);
+  if (!Number.isFinite(performedAt)) {
+    return "Unknown time";
+  }
+
+  return new Date(performedAtIso).toLocaleString();
+}
+
+function formatJointFeedback(jointFeedback) {
+  if (!jointFeedback || Object.keys(jointFeedback).length === 0) {
+    return "No joint discomfort recorded.";
+  }
+
+  return Object.entries(jointFeedback)
+    .map(([jointId, score]) => `${formatJointLabel(jointId)} ${score}/10`)
+    .join(", ");
+}
+
+function findHighestLoadJoint(computed) {
+  if (!computed?.byJoint) {
+    return null;
+  }
+
+  return [...JOINT_IDS].sort((a, b) => computed.byJoint[b] - computed.byJoint[a])[0] || null;
+}
+
+function formatTopJointLoads(computed) {
+  if (!computed?.byJoint) {
+    return "No load details available.";
+  }
+
+  const topLoads = [...JOINT_IDS]
+    .map((jointId) => ({
+      jointId,
+      value: Number(computed.byJoint[jointId] || 0)
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3);
+
+  if (topLoads.length === 0) {
+    return "No load details available.";
+  }
+
+  return topLoads
+    .map((item) => `${formatJointLabel(item.jointId)} ${formatLoadValue(item.value)}`)
+    .join(" · ");
+}
+
 export default function App() {
-  const [activeView, setActiveView] = useState("checkin");
-  const [currentPain, setCurrentPain] = useState("4");
-  const [priorPain, setPriorPain] = useState("2");
-  const [readiness, setReadiness] = useState("medium");
-  const [symptomWorsenedIn24h, setSymptomWorsenedIn24h] = useState(false);
+  const [activeView, setActiveView] = useState("main");
+  const [sessionPainScore, setSessionPainScore] = useState("4");
 
   const [entries, setEntries] = useState(() => appHistoryStore.getEntries());
   const [templates] = useState(() => appHistoryStore.getTemplates());
@@ -107,11 +163,23 @@ export default function App() {
   const [variant, setVariant] = useState("base");
   const [feedbackJoint, setFeedbackJoint] = useState("none");
   const [feedbackScore, setFeedbackScore] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState(() => {
+    return resolveSelectedSessionId({
+      entries,
+      selectedSessionId: null
+    });
+  });
   const [showAllJointSeries, setShowAllJointSeries] = useState(false);
   const [entryError, setEntryError] = useState("");
   const [feedbackNotice, setFeedbackNotice] = useState(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const feedbackTimerRef = useRef(null);
+  const scrollViewRef = useRef(null);
+  const layoutRegistryRef = useRef({});
+  const focusedFieldKeyRef = useRef(null);
+  const scrollOffsetRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+  const keyboardHeightRef = useRef(0);
 
   const loadSummary = useMemo(() => {
     return summarizeRollingLoad({
@@ -127,12 +195,12 @@ export default function App() {
   const baseRecommendation = useMemo(
     () =>
       adaptSession({
-        currentPain: Number(currentPain) || 0,
-        priorPain: Number(priorPain) || 0,
-        readiness,
-        symptomWorsenedIn24h
+        currentPain: Number(sessionPainScore) || 0,
+        priorPain: Number(sessionPainScore) || 0,
+        readiness: "medium",
+        symptomWorsenedIn24h: false
       }),
-    [currentPain, priorPain, readiness, symptomWorsenedIn24h]
+    [sessionPainScore]
   );
 
   const recommendation = useMemo(() => {
@@ -177,6 +245,13 @@ export default function App() {
     });
   }, [dailyLoadSeries, visibleJointSeries]);
 
+  const resolvedSelectedSessionId = useMemo(() => {
+    return resolveSelectedSessionId({
+      entries,
+      selectedSessionId
+    });
+  }, [entries, selectedSessionId]);
+
   const rawChartAxisMax = Math.max(
     unifiedLoadChart.maxValue,
     Number(riskGuide?.highDailyThreshold || 0)
@@ -188,6 +263,116 @@ export default function App() {
     return new Map(templates.map((template) => [template.id, template]));
   }, [templates]);
 
+  const selectedSession = useMemo(() => {
+    return entries.find((entry) => entry.id === resolvedSelectedSessionId) || null;
+  }, [entries, resolvedSelectedSessionId]);
+
+  const selectedSessionTemplate = useMemo(() => {
+    if (!selectedSession) {
+      return null;
+    }
+
+    return templateById.get(selectedSession.templateId) || null;
+  }, [selectedSession, templateById]);
+
+  const selectedSessionLoad = useMemo(() => {
+    if (!selectedSession || !selectedSessionTemplate) {
+      return null;
+    }
+
+    return computeEntryJointLoad(selectedSession, selectedSessionTemplate);
+  }, [selectedSession, selectedSessionTemplate]);
+
+  const selectedSessionHighestJoint = useMemo(() => {
+    return findHighestLoadJoint(selectedSessionLoad);
+  }, [selectedSessionLoad]);
+
+  const selectedSessionLoadSummary = useMemo(() => {
+    return formatTopJointLoads(selectedSessionLoad);
+  }, [selectedSessionLoad]);
+
+  function captureLayout(layoutKey, parentKey = null) {
+    return (event) => {
+      const { y, height } = event.nativeEvent.layout;
+      const parentY = parentKey ? Number(layoutRegistryRef.current[parentKey]?.y || 0) : 0;
+      layoutRegistryRef.current[layoutKey] = {
+        y: parentY + y,
+        height
+      };
+    };
+  }
+
+  function scrollToLayout(
+    layoutKey,
+    {
+      reason = "reveal",
+      keyboardHeightOverride = keyboardHeightRef.current,
+      topMargin = 16,
+      gap = 12
+    } = {}
+  ) {
+    const layout = layoutRegistryRef.current[layoutKey];
+    if (!layout || !scrollViewRef.current) {
+      return;
+    }
+
+    const nextOffset =
+      reason === "keyboard" && viewportHeightRef.current > 0
+        ? computeKeyboardAwareScrollOffset({
+            targetY: layout.y,
+            targetHeight: layout.height,
+            viewportHeight: viewportHeightRef.current,
+            keyboardHeight: keyboardHeightOverride,
+            currentOffset: scrollOffsetRef.current,
+            gap
+          })
+        : computeRevealScrollOffset({
+            targetY: layout.y,
+            topMargin
+          });
+
+    scrollViewRef.current.scrollTo({
+      y: nextOffset,
+      animated: true
+    });
+    scrollOffsetRef.current = nextOffset;
+  }
+
+  function handleInputFocus(layoutKey) {
+    focusedFieldKeyRef.current = layoutKey;
+
+    if (keyboardHeightRef.current > 0) {
+      requestAnimationFrame(() => {
+        scrollToLayout(layoutKey, {
+          reason: "keyboard",
+          keyboardHeightOverride: keyboardHeightRef.current
+        });
+      });
+    }
+  }
+
+  function handleDeleteSelectedSession() {
+    if (!resolvedSelectedSessionId) {
+      return;
+    }
+
+    const nextSessionState = deleteSessionById({
+      entries,
+      selectedSessionId: resolvedSelectedSessionId,
+      entryId: resolvedSelectedSessionId
+    });
+    const nextToleranceState = rebuildToleranceStateFromEntries({
+      entries: nextSessionState.entries
+    });
+
+    appHistoryStore.setEntries(nextSessionState.entries);
+    appHistoryStore.setToleranceState(nextToleranceState);
+
+    setEntries(nextSessionState.entries);
+    setToleranceState(nextToleranceState);
+    setSelectedSessionId(nextSessionState.selectedSessionId);
+  }
+
   function clearFeedbackTimer() {
     if (feedbackTimerRef.current) {
       clearTimeout(feedbackTimerRef.current);
@@ -198,6 +383,44 @@ export default function App() {
   useEffect(() => {
     return () => {
       clearFeedbackTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (resolvedSelectedSessionId !== selectedSessionId) {
+      setSelectedSessionId(resolvedSelectedSessionId);
+    }
+  }, [resolvedSelectedSessionId, selectedSessionId]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const handleKeyboardShow = (event) => {
+      const nextHeight = Math.max(0, Number(event?.endCoordinates?.height) || 0);
+      keyboardHeightRef.current = nextHeight;
+      setKeyboardHeight(nextHeight);
+
+      if (focusedFieldKeyRef.current) {
+        requestAnimationFrame(() => {
+          scrollToLayout(focusedFieldKeyRef.current, {
+            reason: "keyboard",
+            keyboardHeightOverride: nextHeight
+          });
+        });
+      }
+    };
+    const handleKeyboardHide = () => {
+      keyboardHeightRef.current = 0;
+      setKeyboardHeight(0);
+    };
+
+    const showSubscription = Keyboard.addListener(showEvent, handleKeyboardShow);
+    const hideSubscription = Keyboard.addListener(hideEvent, handleKeyboardHide);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
     };
   }, []);
 
@@ -244,6 +467,7 @@ export default function App() {
   }
 
   function handleAddEntry() {
+    const pain = Number(sessionPainScore);
     const duration = Number(durationMinutes);
     const effort = Number(effortScore);
     const emitValidationError = (message) => {
@@ -256,6 +480,11 @@ export default function App() {
 
     if (!templateId) {
       emitValidationError("Select an exercise template.");
+      return;
+    }
+
+    if (!Number.isFinite(pain) || pain < 0 || pain > 10) {
+      emitValidationError("Pain score must be between 0 and 10.");
       return;
     }
 
@@ -282,6 +511,7 @@ export default function App() {
       id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       templateId,
       performedAtIso: nowIso,
+      painScore: pain,
       durationMinutes: duration,
       effortScore: effort,
       variant,
@@ -302,6 +532,7 @@ export default function App() {
 
     setEntries(updatedEntries);
     setToleranceState(updatedTolerance);
+    setSelectedSessionId(nextEntry.id);
     setEntryError("");
     setFeedbackScore("");
     emitFeedback({
@@ -516,348 +747,327 @@ export default function App() {
     </View>
   );
 
-  return (
-    <SafeAreaView style={styles.root}>
-      <ScrollView testID="main-scroll" contentContainerStyle={styles.container}>
-        <TopFeedbackBanner notice={feedbackNotice} />
-        <Text testID="screen-home-title" style={styles.title}>
-          Superstar PT
+  const sessionBrowserCard = (
+    <View testID="card-session-browser" style={styles.card}>
+      <View testID="session-browser-header" style={styles.sessionBrowserHeader}>
+        <Text testID="session-browser-title" style={styles.sectionTitle}>
+          Session Browser
         </Text>
-        <Text style={styles.subtitle}>Adaptive daily training check-in + load intelligence</Text>
-
-        <View style={styles.viewToggleRow}>
-          <Pressable
-            testID="btn-view-checkin"
-            onPress={() => handleViewChange("checkin")}
-            style={[
-              styles.viewToggle,
-              activeView === "checkin" ? styles.viewToggleActive : styles.viewToggleInactive
-            ]}
-          >
-            <Text
-              style={[
-                styles.viewToggleText,
-                activeView === "checkin" ? styles.viewToggleTextActive : styles.viewToggleTextInactive
-              ]}
-            >
-              Check-In
-            </Text>
-          </Pressable>
-          <Pressable
-            testID="btn-view-load-map"
-            onPress={() => handleViewChange("load")}
-            style={[
-              styles.viewToggle,
-              activeView === "load" ? styles.viewToggleActive : styles.viewToggleInactive
-            ]}
-          >
-            <Text
-              style={[
-                styles.viewToggleText,
-                activeView === "load" ? styles.viewToggleTextActive : styles.viewToggleTextInactive
-              ]}
-            >
-              Load Map
-            </Text>
-          </Pressable>
-          <Pressable
-            testID="btn-view-visualization"
-            onPress={() => handleViewChange("visualization")}
-            style={[
-              styles.viewToggle,
-              activeView === "visualization" ? styles.viewToggleActive : styles.viewToggleInactive
-            ]}
-          >
-            <Text
-              style={[
-                styles.viewToggleText,
-                activeView === "visualization"
-                  ? styles.viewToggleTextActive
-                  : styles.viewToggleTextInactive
-              ]}
-            >
-              Visualization
-            </Text>
-          </Pressable>
-        </View>
-
-        {activeView === "checkin" ? (
-          <>
-            <View testID="card-load-over-time" style={styles.card}>
-              <Text style={styles.label}>Current pain (0-10)</Text>
-              <TextInput
-                testID="input-current-pain"
-                value={currentPain}
-                onChangeText={setCurrentPain}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
-
-              <Text style={styles.label}>Prior pain (0-10)</Text>
-              <TextInput
-                testID="input-prior-pain"
-                value={priorPain}
-                onChangeText={setPriorPain}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
-
-              <Text style={styles.label}>Readiness</Text>
-              <View style={styles.row}>
-                {READINESS_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option}
-                    onPress={() => setReadiness(option)}
-                    testID={`btn-readiness-${option}`}
-                    style={[
-                      styles.pill,
-                      readiness === option ? styles.pillActive : styles.pillInactive
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pillText,
-                        readiness === option
-                          ? styles.pillTextActive
-                          : styles.pillTextInactive
-                      ]}
-                    >
-                      {option}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <View style={styles.switchRow}>
-                <Text style={styles.label}>Symptoms worsened in 24h</Text>
-                <Switch
-                  testID="switch-symptom-worsened"
-                  value={symptomWorsenedIn24h}
-                  onValueChange={setSymptomWorsenedIn24h}
-                />
-              </View>
-            </View>
-
-            <View style={styles.resultCard}>
-              <Text style={styles.resultTitle}>Today&apos;s recommendation</Text>
-              <Text testID="result-action-label" style={styles.resultItem}>
-                Action: {recommendation.action}
-              </Text>
-              <Text style={styles.resultItem}>
-                Intensity: x{recommendation.intensityMultiplier}
-              </Text>
-              <Text style={styles.resultText}>{recommendation.recommendation}</Text>
-              {recommendation.overrideApplied ? (
-                <Text testID="joint-risk-override-note" style={styles.overrideNote}>
-                  Joint-load override applied due to elevated risk.
-                </Text>
-              ) : null}
-            </View>
-          </>
-        ) : activeView === "load" ? (
-          <>
-            <View style={styles.card}>
-              <View style={styles.quickAddHeaderRow}>
-                <Text style={styles.sectionTitle}>Quick Add Session</Text>
-                <Pressable testID="btn-add-session" style={styles.quickAddButton} onPress={handleAddEntry}>
-                  <Text style={styles.quickAddButtonText}>Add session</Text>
-                </Pressable>
-              </View>
-
-              <Text style={styles.label}>Exercise template</Text>
-              <View style={styles.wrapRow}>
-                {templates.map((template) => (
-                  <Pressable
-                    key={template.id}
-                    testID={`btn-template-${template.id}`}
-                    onPress={() => setTemplateId(template.id)}
-                    style={[
-                      styles.pill,
-                      templateId === template.id ? styles.pillActive : styles.pillInactive
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pillText,
-                        templateId === template.id
-                          ? styles.pillTextActive
-                          : styles.pillTextInactive
-                      ]}
-                    >
-                      {template.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={styles.label}>Variant</Text>
-              <View style={styles.row}>
-                {VARIANT_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option}
-                    testID={`btn-variant-${option}`}
-                    onPress={() => setVariant(option)}
-                    style={[
-                      styles.pill,
-                      variant === option ? styles.pillActive : styles.pillInactive
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pillText,
-                        variant === option
-                          ? styles.pillTextActive
-                          : styles.pillTextInactive
-                      ]}
-                    >
-                      {option}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={styles.label}>Duration (minutes)</Text>
-              <TextInput
-                testID="input-duration-minutes"
-                value={durationMinutes}
-                onChangeText={setDurationMinutes}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
-
-              <Text style={styles.label}>Effort (1-10)</Text>
-              <TextInput
-                testID="input-effort-score"
-                value={effortScore}
-                onChangeText={setEffortScore}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
-
-              <Text style={styles.label}>Optional joint discomfort feedback</Text>
-              <View style={styles.wrapRow}>
+        <Text testID="session-browser-count" style={styles.sessionBrowserCount}>
+          {entries.length} saved
+        </Text>
+      </View>
+      {entries.length === 0 ? (
+        <Text testID="session-browser-empty" style={styles.chartEmptyText}>
+          No sessions added yet.
+        </Text>
+      ) : (
+        <>
+          <View style={styles.sessionList}>
+            {entries.map((entry, index) => {
+              const template = templateById.get(entry.templateId);
+              const isSelected = entry.id === resolvedSelectedSessionId;
+              const painText = Number.isFinite(Number(entry.painScore)) ? `${entry.painScore}/10` : "N/A";
+              return (
                 <Pressable
-                  onPress={() => setFeedbackJoint("none")}
+                  key={entry.id}
+                  testID={`btn-session-row-${index}`}
+                  onPress={() => setSelectedSessionId(entry.id)}
                   style={[
-                    styles.pill,
-                    feedbackJoint === "none" ? styles.pillActive : styles.pillInactive
+                    styles.sessionListItem,
+                    isSelected ? styles.sessionListItemActive : styles.sessionListItemInactive
                   ]}
                 >
                   <Text
                     style={[
-                      styles.pillText,
-                      feedbackJoint === "none"
-                        ? styles.pillTextActive
-                        : styles.pillTextInactive
+                      styles.sessionListTitle,
+                      isSelected ? styles.sessionListTitleActive : styles.sessionListTitleInactive
                     ]}
                   >
-                    none
+                    {template?.name || entry.templateId}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sessionListMeta,
+                      isSelected ? styles.sessionListMetaActive : styles.sessionListMetaInactive
+                    ]}
+                  >
+                    {formatPerformedAt(entry.performedAtIso)} · {entry.durationMinutes} min · effort{" "}
+                    {entry.effortScore} · pain {painText}
                   </Text>
                 </Pressable>
-                {JOINT_IDS.map((jointId) => (
-                  <Pressable
-                    key={jointId}
-                    onPress={() => setFeedbackJoint(jointId)}
-                    style={[
-                      styles.pill,
-                      feedbackJoint === jointId ? styles.pillActive : styles.pillInactive
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pillText,
-                        feedbackJoint === jointId
-                          ? styles.pillTextActive
-                          : styles.pillTextInactive
-                      ]}
-                    >
-                      {jointId}
-                    </Text>
-                  </Pressable>
-                ))}
+              );
+            })}
+          </View>
+
+          {selectedSession ? (
+            <View testID="session-detail-card" style={styles.sessionDetailCard}>
+              <View style={styles.sessionDetailHeaderRow}>
+                <View style={styles.sessionDetailHeaderText}>
+                  <Text testID="session-detail-title" style={styles.sessionDetailTitle}>
+                    {selectedSessionTemplate?.name || selectedSession.templateId}
+                  </Text>
+                  <Text style={styles.sessionDetailSubtitle}>Selected session</Text>
+                </View>
+                <Pressable
+                  testID="btn-delete-selected-session"
+                  onPress={handleDeleteSelectedSession}
+                  style={styles.deleteSessionButton}
+                >
+                  <Text style={styles.deleteSessionButtonText}>Delete</Text>
+                </Pressable>
               </View>
 
-              {feedbackJoint !== "none" ? (
-                <TextInput
-                  testID="input-joint-feedback"
-                  value={feedbackScore}
-                  onChangeText={setFeedbackScore}
-                  keyboardType="number-pad"
-                  style={styles.input}
-                  placeholder="Discomfort 0-10"
-                  placeholderTextColor="#678475"
-                />
-              ) : null}
+              <Text style={styles.sessionDetailLabel}>Performed</Text>
+              <Text style={styles.sessionDetailValue}>
+                {formatPerformedAt(selectedSession.performedAtIso)}
+              </Text>
 
-              {entryError ? <Text style={styles.errorText}>{entryError}</Text> : null}
+              <Text style={styles.sessionDetailLabel}>Session details</Text>
+              <Text testID="session-detail-summary" style={styles.sessionDetailValue}>
+                {selectedSession.durationMinutes} min · effort {selectedSession.effortScore} · pain{" "}
+                {Number.isFinite(Number(selectedSession.painScore))
+                  ? `${selectedSession.painScore}/10`
+                  : "N/A"}{" "}
+                · {selectedSession.variant}
+              </Text>
 
-              <Pressable style={styles.addButton} onPress={handleAddEntry}>
-                <Text style={styles.addButtonText}>Add session</Text>
-              </Pressable>
+              <Text style={styles.sessionDetailLabel}>Joint discomfort</Text>
+              <Text style={styles.sessionDetailValue}>
+                {formatJointFeedback(selectedSession.jointFeedback)}
+              </Text>
+
+              <Text style={styles.sessionDetailLabel}>Highest joint load</Text>
+              <Text testID="session-detail-highest-joint" style={styles.sessionDetailValue}>
+                {selectedSessionHighestJoint
+                  ? `${formatJointLabel(selectedSessionHighestJoint)}`
+                  : "No joint load recorded."}
+              </Text>
+
+              <Text style={styles.sessionDetailLabel}>Top joint loads</Text>
+              <Text testID="session-detail-top-joint-loads" style={styles.sessionDetailValue}>
+                {selectedSessionLoadSummary}
+              </Text>
             </View>
+          ) : null}
+        </>
+      )}
+    </View>
+  );
 
+  const addSessionCard = (
+    <View testID="card-add-session" style={styles.card} onLayout={captureLayout("load-form-card")}>
+      <View style={styles.quickAddHeaderRow}>
+        <Text style={styles.sectionTitle}>Add Session</Text>
+        <Pressable testID="btn-add-session" style={styles.quickAddButton} onPress={handleAddEntry}>
+          <Text style={styles.quickAddButtonText}>Add session</Text>
+        </Pressable>
+      </View>
+
+      <View onLayout={captureLayout("field-session-pain", "load-form-card")}>
+        <Text style={styles.label}>Pain (0-10)</Text>
+        <TextInput
+          testID="input-session-pain"
+          value={sessionPainScore}
+          onChangeText={setSessionPainScore}
+          onFocus={() => handleInputFocus("field-session-pain")}
+          keyboardType="number-pad"
+          style={styles.input}
+        />
+      </View>
+
+      <Text style={styles.label}>Exercise template</Text>
+      <View style={styles.wrapRow}>
+        {templates.map((template) => (
+          <Pressable
+            key={template.id}
+            testID={`btn-template-${template.id}`}
+            onPress={() => setTemplateId(template.id)}
+            style={[styles.pill, templateId === template.id ? styles.pillActive : styles.pillInactive]}
+          >
+            <Text
+              style={[
+                styles.pillText,
+                templateId === template.id ? styles.pillTextActive : styles.pillTextInactive
+              ]}
+            >
+              {template.name}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.label}>Variant</Text>
+      <View style={styles.row}>
+        {VARIANT_OPTIONS.map((option) => (
+          <Pressable
+            key={option}
+            testID={`btn-variant-${option}`}
+            onPress={() => setVariant(option)}
+            style={[styles.pill, variant === option ? styles.pillActive : styles.pillInactive]}
+          >
+            <Text
+              style={[styles.pillText, variant === option ? styles.pillTextActive : styles.pillTextInactive]}
+            >
+              {option}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View onLayout={captureLayout("field-duration-minutes", "load-form-card")}>
+        <Text style={styles.label}>Duration (minutes)</Text>
+        <TextInput
+          testID="input-duration-minutes"
+          value={durationMinutes}
+          onChangeText={setDurationMinutes}
+          onFocus={() => handleInputFocus("field-duration-minutes")}
+          keyboardType="number-pad"
+          style={styles.input}
+        />
+      </View>
+
+      <View onLayout={captureLayout("field-effort-score", "load-form-card")}>
+        <Text style={styles.label}>Effort (1-10)</Text>
+        <TextInput
+          testID="input-effort-score"
+          value={effortScore}
+          onChangeText={setEffortScore}
+          onFocus={() => handleInputFocus("field-effort-score")}
+          keyboardType="number-pad"
+          style={styles.input}
+        />
+      </View>
+
+      <Text style={styles.label}>Optional joint discomfort feedback</Text>
+      <View style={styles.wrapRow}>
+        <Pressable
+          testID="btn-feedback-joint-none"
+          onPress={() => setFeedbackJoint("none")}
+          style={[styles.pill, feedbackJoint === "none" ? styles.pillActive : styles.pillInactive]}
+        >
+          <Text
+            style={[
+              styles.pillText,
+              feedbackJoint === "none" ? styles.pillTextActive : styles.pillTextInactive
+            ]}
+          >
+            none
+          </Text>
+        </Pressable>
+        {JOINT_IDS.map((jointId) => (
+          <Pressable
+            key={jointId}
+            testID={`btn-feedback-joint-${jointId}`}
+            onPress={() => setFeedbackJoint(jointId)}
+            style={[styles.pill, feedbackJoint === jointId ? styles.pillActive : styles.pillInactive]}
+          >
+            <Text
+              style={[
+                styles.pillText,
+                feedbackJoint === jointId ? styles.pillTextActive : styles.pillTextInactive
+              ]}
+            >
+              {jointId}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {feedbackJoint !== "none" ? (
+        <View onLayout={captureLayout("field-joint-feedback", "load-form-card")}>
+          <TextInput
+            testID="input-joint-feedback"
+            value={feedbackScore}
+            onChangeText={setFeedbackScore}
+            onFocus={() => handleInputFocus("field-joint-feedback")}
+            keyboardType="number-pad"
+            style={styles.input}
+            placeholder="Discomfort 0-10"
+            placeholderTextColor="#678475"
+          />
+        </View>
+      ) : null}
+
+      {entryError ? (
+        <Text testID="entry-error-text" style={styles.errorText}>
+          {entryError}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  const recommendationCard = (
+    <View style={styles.resultCard}>
+      <Text style={styles.resultTitle}>Suggested Session Guidance</Text>
+      <Text testID="result-action-label" style={styles.resultItem}>
+        Action: {recommendation.action}
+      </Text>
+      <Text style={styles.resultItem}>Intensity: x{recommendation.intensityMultiplier}</Text>
+      <Text style={styles.resultItem}>Overall risk: {loadSummary.overallRisk}</Text>
+      <Text style={styles.resultText}>Top stressed joints: {topJointText || "N/A"}</Text>
+      <Text style={styles.resultText}>{recommendation.recommendation}</Text>
+      {recommendation.overrideApplied ? (
+        <Text testID="joint-risk-override-note" style={styles.overrideNote}>
+          Joint-load override applied due to elevated risk.
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.root}>
+      <ScrollView
+        ref={scrollViewRef}
+        testID="main-scroll"
+        keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        onLayout={(event) => {
+          viewportHeightRef.current = event.nativeEvent.layout.height;
+        }}
+        onScroll={(event) => {
+          scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+        }}
+        contentContainerStyle={[
+          styles.container,
+          { paddingBottom: Math.max(28, keyboardHeight + 24) }
+        ]}
+      >
+        <Text testID="screen-home-title" style={styles.title}>
+          Superstar PT
+        </Text>
+        <Text style={styles.subtitle}>Session browser + adaptive load intelligence</Text>
+
+        {activeView === "main" ? (
+          <>
+            {sessionBrowserCard}
+            {addSessionCard}
+            {recommendationCard}
             <Pressable
-              testID="btn-open-visualization"
+              testID="btn-view-visualization"
               onPress={() => handleViewChange("visualization")}
               style={styles.visualizationShortcut}
             >
               <Text style={styles.visualizationShortcutText}>Open joint-load visualization</Text>
             </Pressable>
-
-            <View style={styles.resultCard}>
-              <Text style={styles.resultTitle}>Caution + Guidance</Text>
-              <Text style={styles.resultItem}>Overall risk: {loadSummary.overallRisk}</Text>
-              <Text style={styles.resultText}>Top stressed joints: {topJointText || "N/A"}</Text>
-              <Text style={styles.resultText}>Total load (14d): {loadSummary.totalBodyLoad}</Text>
-            </View>
-
-            <Pressable
-              testID="btn-toggle-history"
-              onPress={() => setShowHistory((value) => !value)}
-              style={styles.historyToggle}
-            >
-              <Text style={styles.historyToggleText}>
-                {showHistory ? "Hide" : "Show more"} history
-              </Text>
-            </Pressable>
-
-            {showHistory ? (
-              <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Exercise History</Text>
-                {entries.length === 0 ? <Text style={styles.resultText}>No sessions added yet.</Text> : null}
-                {entries.map((entry) => {
-                  const template = templateById.get(entry.templateId);
-                  const computed = computeEntryJointLoad(entry, template);
-                  return (
-                    <View key={entry.id} style={styles.historyRow}>
-                      <Text style={styles.historyTitle}>{template?.name || entry.templateId}</Text>
-                      <Text style={styles.historyText}>
-                        {new Date(entry.performedAtIso).toLocaleString()} · {entry.durationMinutes} min · effort {entry.effortScore} · {entry.variant}
-                      </Text>
-                      <Text style={styles.historyText}>
-                        Highest joint load: {
-                          [...JOINT_IDS]
-                            .sort((a, b) => computed.byJoint[b] - computed.byJoint[a])[0]
-                        }
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
           </>
         ) : (
           <View testID="view-joint-load-visualization" style={styles.visualizationView}>
+            <Pressable
+              testID="btn-view-main"
+              onPress={() => handleViewChange("main")}
+              style={styles.visualizationShortcut}
+            >
+              <Text style={styles.visualizationShortcutText}>Back to sessions</Text>
+            </Pressable>
             {loadVisualizationCard}
-            <View style={styles.resultCard}>
-              <Text style={styles.resultTitle}>Caution + Guidance</Text>
-              <Text style={styles.resultItem}>Overall risk: {loadSummary.overallRisk}</Text>
-              <Text style={styles.resultText}>Top stressed joints: {topJointText || "N/A"}</Text>
-              <Text style={styles.resultText}>Total load (14d): {loadSummary.totalBodyLoad}</Text>
-            </View>
+            {recommendationCard}
           </View>
         )}
       </ScrollView>
+      <View pointerEvents="box-none" style={styles.feedbackOverlay}>
+        <TopFeedbackBanner notice={feedbackNotice} />
+      </View>
       <StatusBar style="dark" />
     </SafeAreaView>
   );
@@ -865,6 +1075,13 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#f1f7f3" },
+  feedbackOverlay: {
+    position: "absolute",
+    top: 10,
+    left: 20,
+    right: 20,
+    zIndex: 20
+  },
   container: {
     paddingHorizontal: 20,
     paddingVertical: 28,
@@ -1097,6 +1314,83 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   historyToggleText: { color: "#1d4c38", fontWeight: "700" },
+  sessionBrowserHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8
+  },
+  sessionBrowserCount: { fontSize: 13, color: "#3b6855", fontWeight: "700" },
+  sessionList: {
+    gap: 10
+  },
+  sessionListItem: {
+    borderRadius: 14,
+    padding: 12,
+    gap: 4
+  },
+  sessionListItemActive: {
+    backgroundColor: "#0f6b47"
+  },
+  sessionListItemInactive: {
+    backgroundColor: "#edf4f0"
+  },
+  sessionListTitle: { fontSize: 15, fontWeight: "700" },
+  sessionListTitleActive: { color: "#ffffff" },
+  sessionListTitleInactive: { color: "#173b2e" },
+  sessionListMeta: { fontSize: 12, lineHeight: 17 },
+  sessionListMetaActive: { color: "#dff8ea" },
+  sessionListMetaInactive: { color: "#456a5a" },
+  sessionDetailCard: {
+    borderRadius: 14,
+    backgroundColor: "#f4f7f5",
+    padding: 14,
+    gap: 6
+  },
+  sessionDetailHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 2
+  },
+  sessionDetailHeaderText: {
+    flex: 1,
+    gap: 2
+  },
+  sessionDetailTitle: {
+    fontSize: 17,
+    color: "#103725",
+    fontWeight: "700"
+  },
+  sessionDetailSubtitle: {
+    fontSize: 12,
+    color: "#4d6f60",
+    fontWeight: "600"
+  },
+  sessionDetailLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#527262",
+    fontWeight: "700",
+    textTransform: "uppercase"
+  },
+  sessionDetailValue: {
+    fontSize: 14,
+    color: "#1c4535",
+    lineHeight: 20
+  },
+  deleteSessionButton: {
+    backgroundColor: "#ffe4e4",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  deleteSessionButtonText: {
+    color: "#a02d2d",
+    fontSize: 12,
+    fontWeight: "700"
+  },
   historyRow: {
     borderTopWidth: 1,
     borderTopColor: "#d5e7de",
