@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   SafeAreaView,
@@ -10,7 +10,10 @@ import {
   TextInput,
   View
 } from "react-native";
+import { TopFeedbackBanner } from "./src/TopFeedbackBanner";
 import { adaptSession } from "./src/adaptivePlan.mjs";
+import { resolveFeedbackEvent } from "./src/feedbackPolicy.mjs";
+import { triggerHaptic } from "./src/hapticsClient.mjs";
 import { appHistoryStore } from "./src/historyStore.mjs";
 import {
   buildDailyLoadSeries,
@@ -107,6 +110,8 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [showAllJointSeries, setShowAllJointSeries] = useState(false);
   const [entryError, setEntryError] = useState("");
+  const [feedbackNotice, setFeedbackNotice] = useState(null);
+  const feedbackTimerRef = useRef(null);
 
   const loadSummary = useMemo(() => {
     return summarizeRollingLoad({
@@ -183,29 +188,91 @@ export default function App() {
     return new Map(templates.map((template) => [template.id, template]));
   }, [templates]);
 
+  function clearFeedbackTimer() {
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      clearFeedbackTimer();
+    };
+  }, []);
+
+  function showFeedbackBanner(banner) {
+    if (!banner) {
+      return;
+    }
+
+    clearFeedbackTimer();
+    setFeedbackNotice({
+      kind: banner.kind,
+      message: banner.message,
+      ttlMs: banner.ttlMs
+    });
+
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedbackNotice(null);
+      feedbackTimerRef.current = null;
+    }, banner.ttlMs);
+  }
+
+  function emitFeedback(event) {
+    const feedback = resolveFeedbackEvent(event);
+    if (feedback.hapticKind) {
+      void triggerHaptic(feedback.hapticKind);
+    }
+    if (feedback.banner) {
+      showFeedbackBanner(feedback.banner);
+    }
+  }
+
+  function handleViewChange(nextView) {
+    if (nextView === activeView) {
+      return;
+    }
+
+    const previousView = activeView;
+    setActiveView(nextView);
+    emitFeedback({
+      type: "view_change",
+      from: previousView,
+      to: nextView
+    });
+  }
+
   function handleAddEntry() {
     const duration = Number(durationMinutes);
     const effort = Number(effortScore);
+    const emitValidationError = (message) => {
+      setEntryError(message);
+      emitFeedback({
+        type: "session_validation_error",
+        message
+      });
+    };
 
     if (!templateId) {
-      setEntryError("Select an exercise template.");
+      emitValidationError("Select an exercise template.");
       return;
     }
 
     if (!Number.isFinite(duration) || duration <= 0) {
-      setEntryError("Duration must be a positive number.");
+      emitValidationError("Duration must be a positive number.");
       return;
     }
 
     if (!Number.isFinite(effort) || effort < 1 || effort > 10) {
-      setEntryError("Effort score must be between 1 and 10.");
+      emitValidationError("Effort score must be between 1 and 10.");
       return;
     }
 
     if (feedbackJoint !== "none") {
       const score = Number(feedbackScore);
       if (!Number.isFinite(score) || score < 0 || score > 10) {
-        setEntryError("Joint discomfort must be between 0 and 10.");
+        emitValidationError("Joint discomfort must be between 0 and 10.");
         return;
       }
     }
@@ -237,6 +304,10 @@ export default function App() {
     setToleranceState(updatedTolerance);
     setEntryError("");
     setFeedbackScore("");
+    emitFeedback({
+      type: "session_added",
+      templateId
+    });
   }
 
   const topJointText = loadSummary.topStressedJoints
@@ -448,6 +519,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView testID="main-scroll" contentContainerStyle={styles.container}>
+        <TopFeedbackBanner notice={feedbackNotice} />
         <Text testID="screen-home-title" style={styles.title}>
           Superstar PT
         </Text>
@@ -456,7 +528,7 @@ export default function App() {
         <View style={styles.viewToggleRow}>
           <Pressable
             testID="btn-view-checkin"
-            onPress={() => setActiveView("checkin")}
+            onPress={() => handleViewChange("checkin")}
             style={[
               styles.viewToggle,
               activeView === "checkin" ? styles.viewToggleActive : styles.viewToggleInactive
@@ -473,7 +545,7 @@ export default function App() {
           </Pressable>
           <Pressable
             testID="btn-view-load-map"
-            onPress={() => setActiveView("load")}
+            onPress={() => handleViewChange("load")}
             style={[
               styles.viewToggle,
               activeView === "load" ? styles.viewToggleActive : styles.viewToggleInactive
@@ -490,7 +562,7 @@ export default function App() {
           </Pressable>
           <Pressable
             testID="btn-view-visualization"
-            onPress={() => setActiveView("visualization")}
+            onPress={() => handleViewChange("visualization")}
             style={[
               styles.viewToggle,
               activeView === "visualization" ? styles.viewToggleActive : styles.viewToggleInactive
@@ -726,7 +798,7 @@ export default function App() {
 
             <Pressable
               testID="btn-open-visualization"
-              onPress={() => setActiveView("visualization")}
+              onPress={() => handleViewChange("visualization")}
               style={styles.visualizationShortcut}
             >
               <Text style={styles.visualizationShortcutText}>Open joint-load visualization</Text>

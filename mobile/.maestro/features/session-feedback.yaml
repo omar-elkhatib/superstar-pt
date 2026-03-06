@@ -1,0 +1,28 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- tapOn:
+    id: btn-view-load-map
+- assertVisible:
+    id: btn-add-session
+- tapOn:
+    id: btn-add-session
+- assertVisible:
+    id: feedback-banner
+- assertVisible:
+    id: feedback-banner-success
+- takeScreenshot: session_feedback_success_banner
+- tapOn:
+    id: input-duration-minutes
+- eraseText
+- inputText: "0"
+- tapOn:
+    id: btn-add-session
+- tapOn:
+    id: btn-add-session
+- assertVisible:
+    id: feedback-banner
+- assertVisible:
+    id: feedback-banner-error
+- assertVisible: "Duration must be a positive number."
+- takeScreenshot: session_feedback_error_banner
