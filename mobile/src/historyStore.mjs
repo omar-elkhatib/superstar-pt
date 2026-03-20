@@ -1,7 +1,9 @@
 import { DEFAULT_EXERCISE_TEMPLATES } from "./exerciseTemplates.mjs";
+import { saveDailyCheckInRecord } from "./checkInModel.mjs";
 import { createDefaultToleranceState } from "./loadModel.mjs";
 
 const ENTRIES_KEY = "superstar_pt.exercise_entries.v1";
+const CHECK_INS_KEY = "superstar_pt.daily_check_ins.v1";
 const TOLERANCE_KEY = "superstar_pt.joint_tolerance.v1";
 const TEMPLATES_KEY = "superstar_pt.exercise_templates.v1";
 
@@ -53,6 +55,25 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     return remaining;
   }
 
+  function getCheckIns() {
+    return parseOrFallback(storage.getItem(CHECK_INS_KEY), []);
+  }
+
+  function setCheckIns(checkIns) {
+    storage.setItem(CHECK_INS_KEY, JSON.stringify(checkIns));
+  }
+
+  function saveDailyCheckIn(values, { nowIso = new Date().toISOString() } = {}) {
+    const result = saveDailyCheckInRecord({
+      checkIns: getCheckIns(),
+      values,
+      nowIso
+    });
+
+    setCheckIns(result.saved);
+    return result.record;
+  }
+
   function getToleranceState() {
     return parseOrFallback(storage.getItem(TOLERANCE_KEY), createDefaultToleranceState());
   }
@@ -75,6 +96,9 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     setEntries,
     addEntry,
     deleteEntry,
+    getCheckIns,
+    setCheckIns,
+    saveDailyCheckIn,
     getToleranceState,
     setToleranceState,
     getTemplates,

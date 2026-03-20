@@ -13,6 +13,11 @@ import {
 } from "react-native";
 import { TopFeedbackBanner } from "./src/TopFeedbackBanner";
 import { adaptSession } from "./src/adaptivePlan.mjs";
+import {
+  buildDailyRecommendationInput,
+  resolveTodaysCheckIn,
+  selectDailyHomeState
+} from "./src/checkInModel.mjs";
 import { resolveFeedbackEvent } from "./src/feedbackPolicy.mjs";
 import { triggerHaptic } from "./src/hapticsClient.mjs";
 import { appHistoryStore } from "./src/historyStore.mjs";
@@ -150,6 +155,13 @@ function formatTopJointLoads(computed) {
 export default function App() {
   const [activeView, setActiveView] = useState("main");
   const [sessionPainScore, setSessionPainScore] = useState("4");
+  const [checkIns, setCheckIns] = useState(() => appHistoryStore.getCheckIns());
+  const [isCheckInEditorOpen, setIsCheckInEditorOpen] = useState(false);
+  const [checkInPainScore, setCheckInPainScore] = useState("4");
+  const [checkInReadinessScore, setCheckInReadinessScore] = useState("6");
+  const [checkInFatigueScore, setCheckInFatigueScore] = useState("3");
+  const [checkInNote, setCheckInNote] = useState("");
+  const [checkInError, setCheckInError] = useState("");
 
   const [entries, setEntries] = useState(() => appHistoryStore.getEntries());
   const [templates] = useState(() => appHistoryStore.getTemplates());
@@ -192,15 +204,35 @@ export default function App() {
     });
   }, [entries, templates, toleranceState]);
 
+  const currentNowIso = new Date().toISOString();
+  const todaysCheckIn = useMemo(() => {
+    return resolveTodaysCheckIn({
+      checkIns,
+      nowIso: currentNowIso
+    });
+  }, [checkIns, currentNowIso]);
+  const dailyHomeState = useMemo(() => {
+    return selectDailyHomeState({
+      checkIns,
+      nowIso: currentNowIso
+    });
+  }, [checkIns, currentNowIso]);
+  const dailyRecommendationInput = useMemo(() => {
+    return buildDailyRecommendationInput({
+      checkIns,
+      nowIso: currentNowIso
+    });
+  }, [checkIns, currentNowIso]);
+
   const baseRecommendation = useMemo(
     () =>
       adaptSession({
-        currentPain: Number(sessionPainScore) || 0,
-        priorPain: Number(sessionPainScore) || 0,
-        readiness: "medium",
-        symptomWorsenedIn24h: false
+        currentPain: dailyRecommendationInput?.currentPain ?? Number(sessionPainScore) ?? 0,
+        priorPain: dailyRecommendationInput?.priorPain ?? Number(sessionPainScore) ?? 0,
+        readiness: dailyRecommendationInput?.readiness ?? "medium",
+        symptomWorsenedIn24h: dailyRecommendationInput?.symptomWorsenedIn24h ?? false
       }),
-    [sessionPainScore]
+    [dailyRecommendationInput, sessionPainScore]
   );
 
   const recommendation = useMemo(() => {
@@ -387,6 +419,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!todaysCheckIn) {
+      return;
+    }
+
+    setCheckInPainScore(String(todaysCheckIn.painScore));
+    setCheckInReadinessScore(String(todaysCheckIn.readinessScore));
+    setCheckInFatigueScore(String(todaysCheckIn.fatigueScore));
+    setCheckInNote(todaysCheckIn.note || "");
+  }, [todaysCheckIn]);
+
+  useEffect(() => {
     if (resolvedSelectedSessionId !== selectedSessionId) {
       setSelectedSessionId(resolvedSelectedSessionId);
     }
@@ -463,6 +506,72 @@ export default function App() {
       type: "view_change",
       from: previousView,
       to: nextView
+    });
+  }
+
+  function openCheckInEditor() {
+    if (todaysCheckIn) {
+      setCheckInPainScore(String(todaysCheckIn.painScore));
+      setCheckInReadinessScore(String(todaysCheckIn.readinessScore));
+      setCheckInFatigueScore(String(todaysCheckIn.fatigueScore));
+      setCheckInNote(todaysCheckIn.note || "");
+    }
+
+    setCheckInError("");
+    setIsCheckInEditorOpen(true);
+
+    requestAnimationFrame(() => {
+      scrollToLayout("daily-checkin-card");
+    });
+  }
+
+  function handleSaveDailyCheckIn() {
+    const pain = Number(checkInPainScore);
+    const readiness = Number(checkInReadinessScore);
+    const fatigue = Number(checkInFatigueScore);
+    const invalidMessage =
+      !Number.isFinite(pain) || pain < 0 || pain > 10
+        ? "Pain score must be between 0 and 10."
+        : !Number.isFinite(readiness) || readiness < 0 || readiness > 10
+          ? "Readiness score must be between 0 and 10."
+          : !Number.isFinite(fatigue) || fatigue < 0 || fatigue > 10
+            ? "Fatigue score must be between 0 and 10."
+            : "";
+
+    if (invalidMessage) {
+      setCheckInError(invalidMessage);
+      emitFeedback({
+        type: "session_validation_error",
+        message: invalidMessage
+      });
+      return;
+    }
+
+    const savedCheckIn = appHistoryStore.saveDailyCheckIn(
+      {
+        painScore: pain,
+        readinessScore: readiness,
+        fatigueScore: fatigue,
+        note: checkInNote
+      },
+      { nowIso: new Date().toISOString() }
+    );
+
+    setCheckIns(appHistoryStore.getCheckIns());
+    setCheckInPainScore(String(savedCheckIn.painScore));
+    setCheckInReadinessScore(String(savedCheckIn.readinessScore));
+    setCheckInFatigueScore(String(savedCheckIn.fatigueScore));
+    setCheckInNote(savedCheckIn.note || "");
+    setCheckInError("");
+    setIsCheckInEditorOpen(false);
+    setActiveView("main");
+    emitFeedback({
+      type: "session_added",
+      templateId: "daily-checkin"
+    });
+
+    requestAnimationFrame(() => {
+      scrollToLayout("recommendation-card");
     });
   }
 
@@ -747,6 +856,148 @@ export default function App() {
     </View>
   );
 
+  const dailyCheckInCard = (
+    <View
+      testID="card-daily-checkin"
+      style={[styles.card, styles.dailyCheckInCard]}
+      onLayout={captureLayout("daily-checkin-card")}
+    >
+      <View style={styles.quickAddHeaderRow}>
+        <View>
+          <Text style={styles.sectionTitle}>
+            {dailyHomeState.mode === "edit" ? "Today's Check-In" : "Start Your Day"}
+          </Text>
+          <Text style={styles.dailyCheckInSubtext}>
+            {dailyHomeState.status === "missing"
+              ? "Log pain, readiness, and fatigue before you choose today's work."
+              : "Today's condition is saved and ready to drive the recommendation."}
+          </Text>
+        </View>
+        <Pressable
+          testID="btn-open-daily-checkin"
+          onPress={openCheckInEditor}
+          style={styles.quickAddButton}
+        >
+          <Text style={styles.quickAddButtonText}>{dailyHomeState.ctaLabel}</Text>
+        </Pressable>
+      </View>
+
+      {dailyHomeState.status === "missing" ? (
+        <View testID="daily-checkin-missing-state" style={styles.dailyPromptPanel}>
+          <Text style={styles.dailyPromptTitle}>No check-in saved for today.</Text>
+          <Text style={styles.dailyPromptText}>
+            Start here so the app can tailor today&apos;s guidance before you add sessions.
+          </Text>
+        </View>
+      ) : (
+        <View testID="daily-checkin-summary-state" style={styles.dailySummaryPanel}>
+          <Text style={styles.dailySummaryTitle}>Today&apos;s summary</Text>
+          <Text testID="daily-checkin-summary-pain" style={styles.dailySummaryText}>
+            {dailyHomeState.summary.painLabel}
+          </Text>
+          <Text testID="daily-checkin-summary-readiness" style={styles.dailySummaryText}>
+            {dailyHomeState.summary.readinessLabel}
+          </Text>
+          <Text testID="daily-checkin-summary-fatigue" style={styles.dailySummaryText}>
+            {dailyHomeState.summary.fatigueLabel}
+          </Text>
+          <Text style={styles.dailySummaryMeta}>
+            Updated {formatPerformedAt(dailyHomeState.checkIn.updatedAtIso)}
+          </Text>
+          {dailyHomeState.summary.note ? (
+            <Text testID="daily-checkin-summary-note" style={styles.dailySummaryNote}>
+              {dailyHomeState.summary.note}
+            </Text>
+          ) : null}
+        </View>
+      )}
+
+      {isCheckInEditorOpen ? (
+        <View testID="daily-checkin-editor" style={styles.dailyEditorCard}>
+          <Text testID="daily-checkin-mode-label" style={styles.dailyEditorTitle}>
+            {dailyHomeState.mode === "edit" ? "Editing today's check-in" : "Create today's check-in"}
+          </Text>
+
+          <View onLayout={captureLayout("field-checkin-pain", "daily-checkin-card")}>
+            <Text style={styles.label}>Pain (0-10)</Text>
+            <TextInput
+              testID="input-checkin-pain"
+              value={checkInPainScore}
+              onChangeText={setCheckInPainScore}
+              onFocus={() => handleInputFocus("field-checkin-pain")}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+
+          <View onLayout={captureLayout("field-checkin-readiness", "daily-checkin-card")}>
+            <Text style={styles.label}>Readiness (0-10)</Text>
+            <TextInput
+              testID="input-checkin-readiness"
+              value={checkInReadinessScore}
+              onChangeText={setCheckInReadinessScore}
+              onFocus={() => handleInputFocus("field-checkin-readiness")}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+
+          <View onLayout={captureLayout("field-checkin-fatigue", "daily-checkin-card")}>
+            <Text style={styles.label}>Fatigue (0-10)</Text>
+            <TextInput
+              testID="input-checkin-fatigue"
+              value={checkInFatigueScore}
+              onChangeText={setCheckInFatigueScore}
+              onFocus={() => handleInputFocus("field-checkin-fatigue")}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+
+          <View onLayout={captureLayout("field-checkin-note", "daily-checkin-card")}>
+            <Text style={styles.label}>Optional note</Text>
+            <TextInput
+              testID="input-checkin-note"
+              value={checkInNote}
+              onChangeText={setCheckInNote}
+              onFocus={() => handleInputFocus("field-checkin-note")}
+              multiline
+              style={[styles.input, styles.noteInput]}
+              placeholder="How are you feeling this morning?"
+              placeholderTextColor="#678475"
+            />
+          </View>
+
+          {checkInError ? (
+            <Text testID="daily-checkin-error-text" style={styles.errorText}>
+              {checkInError}
+            </Text>
+          ) : null}
+
+          <View style={styles.dailyEditorActionRow}>
+            <Pressable
+              testID="btn-save-daily-checkin"
+              onPress={handleSaveDailyCheckIn}
+              style={styles.quickAddButton}
+            >
+              <Text style={styles.quickAddButtonText}>Save today&apos;s check-in</Text>
+            </Pressable>
+            <Pressable
+              testID="btn-cancel-daily-checkin"
+              onPress={() => {
+                setCheckInError("");
+                setIsCheckInEditorOpen(false);
+              }}
+              style={styles.secondaryActionButton}
+            >
+              <Text style={styles.secondaryActionButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+
   const sessionBrowserCard = (
     <View testID="card-session-browser" style={styles.card}>
       <View testID="session-browser-header" style={styles.sessionBrowserHeader}>
@@ -998,8 +1249,13 @@ export default function App() {
   );
 
   const recommendationCard = (
-    <View style={styles.resultCard}>
+    <View testID="card-todays-recommendation" style={styles.resultCard} onLayout={captureLayout("recommendation-card")}>
       <Text style={styles.resultTitle}>Suggested Session Guidance</Text>
+      <Text testID="recommendation-source-text" style={styles.resultSourceText}>
+        {todaysCheckIn
+          ? "Today's recommendation is based on your current check-in plus recent load."
+          : "Save today's check-in to tailor this guidance before training."}
+      </Text>
       <Text testID="result-action-label" style={styles.resultItem}>
         Action: {recommendation.action}
       </Text>
@@ -1040,6 +1296,7 @@ export default function App() {
 
         {activeView === "main" ? (
           <>
+            {dailyCheckInCard}
             {sessionBrowserCard}
             {addSessionCard}
             {recommendationCard}
@@ -1108,6 +1365,39 @@ const styles = StyleSheet.create({
   },
   visualizationView: { gap: 18 },
   sectionTitle: { fontSize: 18, color: "#0d3b2a", fontWeight: "700" },
+  dailyCheckInCard: {
+    borderWidth: 1,
+    borderColor: "#cfe4d9",
+    backgroundColor: "#f9fcfa"
+  },
+  dailyCheckInSubtext: { fontSize: 13, color: "#3f6a58", marginTop: 4, maxWidth: 220 },
+  dailyPromptPanel: {
+    backgroundColor: "#eff7f2",
+    borderRadius: 12,
+    padding: 14,
+    gap: 6
+  },
+  dailyPromptTitle: { fontSize: 16, fontWeight: "700", color: "#184032" },
+  dailyPromptText: { fontSize: 14, lineHeight: 20, color: "#365f4e" },
+  dailySummaryPanel: {
+    backgroundColor: "#edf7ef",
+    borderRadius: 12,
+    padding: 14,
+    gap: 6
+  },
+  dailySummaryTitle: { fontSize: 16, fontWeight: "700", color: "#184032" },
+  dailySummaryText: { fontSize: 14, color: "#214d3b", fontWeight: "600" },
+  dailySummaryMeta: { fontSize: 12, color: "#4d7665" },
+  dailySummaryNote: { fontSize: 13, color: "#315d4b", lineHeight: 18 },
+  dailyEditorCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#d9e9df"
+  },
+  dailyEditorTitle: { fontSize: 15, fontWeight: "700", color: "#184032" },
   label: { fontSize: 14, color: "#1a3d30", fontWeight: "600" },
   input: {
     backgroundColor: "#f4f7f5",
@@ -1116,6 +1406,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     color: "#0d3b2a"
+  },
+  noteInput: {
+    minHeight: 84,
+    textAlignVertical: "top"
   },
   row: { flexDirection: "row", gap: 8 },
   wrapRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -1142,6 +1436,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   resultTitle: { color: "#d2ffe7", fontSize: 18, fontWeight: "700" },
+  resultSourceText: { color: "#bde9cf", fontSize: 13, lineHeight: 18 },
   resultItem: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
   resultText: { color: "#eafcf3", fontSize: 14, lineHeight: 20 },
   overrideNote: { color: "#ffe3a3", fontSize: 13, fontWeight: "700" },
@@ -1158,6 +1453,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12
   },
+  dailyEditorActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  secondaryActionButton: {
+    backgroundColor: "#deebe3",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  secondaryActionButtonText: { color: "#1d4c38", fontWeight: "700", fontSize: 12 },
   quickAddButtonText: { color: "#ffffff", fontWeight: "700", fontSize: 12 },
   addButton: {
     backgroundColor: "#0f6b47",

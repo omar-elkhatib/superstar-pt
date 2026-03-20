@@ -1,0 +1,50 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- assertVisible:
+    id: card-daily-checkin
+- assertVisible:
+    id: daily-checkin-missing-state
+- assertVisible:
+    id: btn-open-daily-checkin
+- assertVisible:
+    id: card-todays-recommendation
+- takeScreenshot: daily_checkin_missing_state
+- tapOn:
+    id: btn-open-daily-checkin
+- assertVisible:
+    id: daily-checkin-editor
+- assertVisible:
+    id: daily-checkin-mode-label
+- tapOn:
+    id: input-checkin-pain
+- eraseText
+- inputText: "7"
+- tapOn:
+    id: input-checkin-readiness
+- eraseText
+- inputText: "2"
+- tapOn:
+    id: input-checkin-fatigue
+- eraseText
+- inputText: "8"
+- tapOn:
+    id: input-checkin-note
+- inputText: "Worsened after commute"
+- tapOn:
+    id: btn-save-daily-checkin
+- assertVisible:
+    id: daily-checkin-summary-state
+- assertVisible:
+    id: daily-checkin-summary-pain
+- assertVisible:
+    id: daily-checkin-summary-readiness
+- assertVisible:
+    id: daily-checkin-summary-fatigue
+- assertVisible:
+    id: daily-checkin-summary-note
+- assertVisible:
+    id: recommendation-source-text
+- assertVisible:
+    id: result-action-label
+- takeScreenshot: daily_checkin_complete_state
