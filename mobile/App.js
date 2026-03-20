@@ -45,6 +45,12 @@ import {
 } from "./src/scrollBehavior.mjs";
 
 const VARIANT_OPTIONS = ["base", "seated", "supported"];
+const BASELINE_GOAL_OPTIONS = [
+  "move-with-less-pain",
+  "build-consistency",
+  "return-to-running"
+];
+const ACTIVITY_LEVEL_OPTIONS = ["low", "moderate", "high"];
 const LOAD_WINDOW_DAYS = 14;
 const JOINT_SERIES_COLORS = {
   ankle: "#2d77d1",
@@ -60,6 +66,13 @@ const UNIFIED_CHART_HEIGHT = 148;
 
 function formatJointLabel(jointId) {
   return jointId.charAt(0).toUpperCase() + jointId.slice(1);
+}
+
+function formatOptionLabel(value) {
+  return value
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatDayLabel(dayKey) {
@@ -155,6 +168,8 @@ function formatTopJointLoads(computed) {
 export default function App() {
   const [activeView, setActiveView] = useState("main");
   const [sessionPainScore, setSessionPainScore] = useState("4");
+  const [baselineProfile, setBaselineProfile] = useState(() => appHistoryStore.getBaselineProfile());
+  const [onboardingError, setOnboardingError] = useState("");
   const [checkIns, setCheckIns] = useState(() => appHistoryStore.getCheckIns());
   const [isCheckInEditorOpen, setIsCheckInEditorOpen] = useState(false);
   const [checkInPainScore, setCheckInPainScore] = useState("4");
@@ -241,6 +256,11 @@ export default function App() {
       loadSummary
     });
   }, [baseRecommendation, loadSummary]);
+  const onboardingVisible = !baselineProfile.completed;
+  const baselineGoalsSummary = baselineProfile.goals.map(formatOptionLabel).join(", ");
+  const baselineSensitiveAreasSummary = baselineProfile.sensitiveAreas
+    .map(formatJointLabel)
+    .join(", ");
 
   const dailyLoadSeries = useMemo(() => {
     return buildDailyLoadSeries({
@@ -522,6 +542,62 @@ export default function App() {
 
     requestAnimationFrame(() => {
       scrollToLayout("daily-checkin-card");
+    });
+  }
+
+  function toggleBaselineSelection(field, value) {
+    setOnboardingError("");
+    setBaselineProfile((current) => {
+      const currentValues = Array.isArray(current[field]) ? current[field] : [];
+      const nextValues = currentValues.includes(value)
+        ? currentValues.filter((item) => item !== value)
+        : [...currentValues, value];
+
+      return {
+        ...current,
+        [field]: nextValues
+      };
+    });
+  }
+
+  function handleCompleteOnboarding() {
+    if (baselineProfile.goals.length === 0 || !baselineProfile.activityLevel) {
+      const message = "Pick at least one goal and an activity level, or skip for now.";
+      setOnboardingError(message);
+      emitFeedback({
+        type: "session_validation_error",
+        message
+      });
+      return;
+    }
+
+    const savedProfile = appHistoryStore.setBaselineProfile({
+      ...baselineProfile,
+      completed: true,
+      skipped: false
+    });
+    setBaselineProfile(savedProfile);
+    setOnboardingError("");
+    emitFeedback({
+      type: "session_added",
+      templateId: "baseline"
+    });
+  }
+
+  function handleSkipOnboarding() {
+    const savedProfile = appHistoryStore.setBaselineProfile({
+      completed: true,
+      skipped: true,
+      goals: [],
+      activityLevel: "",
+      sensitiveAreas: []
+    });
+    setBaselineProfile(savedProfile);
+    setOnboardingError("");
+    emitFeedback({
+      type: "view_change",
+      from: "onboarding",
+      to: "main"
     });
   }
 
@@ -1248,6 +1324,144 @@ export default function App() {
     </View>
   );
 
+  const onboardingCard = (
+    <View testID="card-onboarding-baseline" style={styles.onboardingCard}>
+      <Text testID="screen-onboarding-title" style={styles.title}>
+        Your Starting Baseline
+      </Text>
+      <Text style={styles.subtitle}>
+        Add a little context so first-day guidance is less generic. You can skip and start using the app
+        right away.
+      </Text>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>What matters most right now?</Text>
+        <View style={styles.wrapRow}>
+          {BASELINE_GOAL_OPTIONS.map((goal) => {
+            const selected = baselineProfile.goals.includes(goal);
+            return (
+              <Pressable
+                key={goal}
+                testID={`btn-onboarding-goal-${goal}`}
+                onPress={() => toggleBaselineSelection("goals", goal)}
+                style={[styles.pill, selected ? styles.pillActive : styles.pillInactive]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    selected ? styles.pillTextActive : styles.pillTextInactive
+                  ]}
+                >
+                  {formatOptionLabel(goal)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.sectionTitle}>Current activity level</Text>
+        <View style={styles.row}>
+          {ACTIVITY_LEVEL_OPTIONS.map((option) => {
+            const selected = baselineProfile.activityLevel === option;
+            return (
+              <Pressable
+                key={option}
+                testID={`btn-onboarding-activity-${option}`}
+                onPress={() => {
+                  setOnboardingError("");
+                  setBaselineProfile((current) => ({
+                    ...current,
+                    activityLevel: option
+                  }));
+                }}
+                style={[styles.pill, selected ? styles.pillActive : styles.pillInactive]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    selected ? styles.pillTextActive : styles.pillTextInactive
+                  ]}
+                >
+                  {formatOptionLabel(option)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.sectionTitle}>Sensitive areas to watch</Text>
+        <View style={styles.wrapRow}>
+          {JOINT_IDS.map((jointId) => {
+            const selected = baselineProfile.sensitiveAreas.includes(jointId);
+            return (
+              <Pressable
+                key={jointId}
+                testID={`btn-onboarding-sensitive-${jointId}`}
+                onPress={() => toggleBaselineSelection("sensitiveAreas", jointId)}
+                style={[styles.pill, selected ? styles.pillActive : styles.pillInactive]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    selected ? styles.pillTextActive : styles.pillTextInactive
+                  ]}
+                >
+                  {formatJointLabel(jointId)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {onboardingError ? (
+          <Text testID="onboarding-error-text" style={styles.errorText}>
+            {onboardingError}
+          </Text>
+        ) : null}
+
+        <View style={styles.onboardingActionRow}>
+          <Pressable
+            testID="btn-onboarding-skip"
+            onPress={handleSkipOnboarding}
+            style={styles.onboardingSecondaryButton}
+          >
+            <Text style={styles.onboardingSecondaryButtonText}>Skip for now</Text>
+          </Pressable>
+          <Pressable
+            testID="btn-onboarding-complete"
+            onPress={handleCompleteOnboarding}
+            style={styles.quickAddButton}
+          >
+            <Text style={styles.quickAddButtonText}>Save baseline</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+
+  const baselineSummaryCard = baselineProfile.skipped ? (
+    <View testID="card-baseline-summary" style={styles.card}>
+      <Text style={styles.sectionTitle}>Baseline context</Text>
+      <Text style={styles.chartEmptyText}>
+        Onboarding was skipped, so guidance is currently based on session history and joint load only.
+      </Text>
+    </View>
+  ) : (
+    <View testID="card-baseline-summary" style={styles.card}>
+      <Text style={styles.sectionTitle}>Baseline context</Text>
+      <Text testID="baseline-summary-goals" style={styles.resultTextLight}>
+        Goals: {baselineGoalsSummary || "Not set"}
+      </Text>
+      <Text testID="baseline-summary-activity" style={styles.resultTextLight}>
+        Activity level:{" "}
+        {baselineProfile.activityLevel ? formatOptionLabel(baselineProfile.activityLevel) : "Not set"}
+      </Text>
+      <Text testID="baseline-summary-sensitive-areas" style={styles.resultTextLight}>
+        Sensitive areas: {baselineSensitiveAreasSummary || "None flagged"}
+      </Text>
+    </View>
+  );
+
   const recommendationCard = (
     <View testID="card-todays-recommendation" style={styles.resultCard} onLayout={captureLayout("recommendation-card")}>
       <Text style={styles.resultTitle}>Suggested Session Guidance</Text>
@@ -1262,6 +1476,14 @@ export default function App() {
       <Text style={styles.resultItem}>Intensity: x{recommendation.intensityMultiplier}</Text>
       <Text style={styles.resultItem}>Overall risk: {loadSummary.overallRisk}</Text>
       <Text style={styles.resultText}>Top stressed joints: {topJointText || "N/A"}</Text>
+      <Text style={styles.resultText}>
+        Baseline context:{" "}
+        {baselineProfile.skipped
+          ? "Onboarding skipped"
+          : baselineProfile.completed
+            ? `${formatOptionLabel(baselineProfile.activityLevel || "unknown")} activity, goals ${baselineGoalsSummary || "not set"}`
+            : "Pending"}
+      </Text>
       <Text style={styles.resultText}>{recommendation.recommendation}</Text>
       {recommendation.overrideApplied ? (
         <Text testID="joint-risk-override-note" style={styles.overrideNote}>
@@ -1294,8 +1516,11 @@ export default function App() {
         </Text>
         <Text style={styles.subtitle}>Session browser + adaptive load intelligence</Text>
 
-        {activeView === "main" ? (
+        {onboardingVisible ? (
+          onboardingCard
+        ) : activeView === "main" ? (
           <>
+            {baselineSummaryCard}
             {dailyCheckInCard}
             {sessionBrowserCard}
             {addSessionCard}
@@ -1344,6 +1569,7 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     gap: 18
   },
+  onboardingCard: { gap: 16 },
   title: { fontSize: 34, fontWeight: "700", color: "#0d3b2a" },
   subtitle: { fontSize: 16, color: "#245f48" },
   viewToggleRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
@@ -1439,8 +1665,21 @@ const styles = StyleSheet.create({
   resultSourceText: { color: "#bde9cf", fontSize: 13, lineHeight: 18 },
   resultItem: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
   resultText: { color: "#eafcf3", fontSize: 14, lineHeight: 20 },
+  resultTextLight: { color: "#214d3b", fontSize: 14, lineHeight: 20 },
   overrideNote: { color: "#ffe3a3", fontSize: 13, fontWeight: "700" },
   errorText: { color: "#962e2e", fontSize: 13, fontWeight: "600" },
+  onboardingActionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  onboardingSecondaryButton: {
+    backgroundColor: "#deebe3",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  onboardingSecondaryButtonText: { color: "#1d4c38", fontWeight: "700", fontSize: 12 },
   quickAddHeaderRow: {
     flexDirection: "row",
     alignItems: "center",

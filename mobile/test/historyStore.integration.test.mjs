@@ -138,3 +138,58 @@ test("rolling summary excludes entries older than 14 days", () => {
   assert.ok(summary.totalBodyLoad > 0);
   assert.ok(summary.byJoint.ankle.chronicLoad < 1000);
 });
+
+test("history store persists completed onboarding baseline across reloads", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  store.setBaselineProfile({
+    completed: true,
+    skipped: false,
+    goals: ["move-with-less-pain", "return-to-running"],
+    activityLevel: "moderate",
+    sensitiveAreas: ["knee", "ankle"]
+  });
+
+  const reloadedStore = createHistoryStore(storage);
+  assert.deepEqual(reloadedStore.getBaselineProfile(), {
+    completed: true,
+    skipped: false,
+    goals: ["move-with-less-pain", "return-to-running"],
+    activityLevel: "moderate",
+    sensitiveAreas: ["knee", "ankle"]
+  });
+});
+
+test("history store supports skipped onboarding without losing daily check-ins", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  store.saveDailyCheckIn(
+    {
+      painScore: 3,
+      readinessScore: 7,
+      fatigueScore: 2,
+      note: "Ready to ease in"
+    },
+    { nowIso: "2026-03-20T08:00:00.000Z" }
+  );
+  store.setBaselineProfile({
+    completed: true,
+    skipped: true,
+    goals: [],
+    activityLevel: "",
+    sensitiveAreas: []
+  });
+
+  const reloadedStore = createHistoryStore(storage);
+  assert.deepEqual(reloadedStore.getBaselineProfile(), {
+    completed: true,
+    skipped: true,
+    goals: [],
+    activityLevel: "",
+    sensitiveAreas: []
+  });
+  assert.equal(reloadedStore.getCheckIns().length, 1);
+  assert.equal(reloadedStore.getCheckIns()[0].note, "Ready to ease in");
+});
