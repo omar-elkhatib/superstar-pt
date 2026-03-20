@@ -1,0 +1,28 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- assertVisible:
+    id: screen-onboarding-title
+- assertVisible:
+    id: card-onboarding-baseline
+- takeScreenshot: onboarding_baseline_first_run
+- tapOn:
+    id: btn-onboarding-goal-move-with-less-pain
+- tapOn:
+    id: btn-onboarding-activity-moderate
+- tapOn:
+    id: btn-onboarding-sensitive-knee
+- tapOn:
+    id: btn-onboarding-complete
+- assertVisible:
+    id: card-baseline-summary
+- assertVisible:
+    id: baseline-summary-goals
+- assertVisible: "Goals: Move With Less Pain"
+- assertVisible:
+    id: baseline-summary-activity
+- assertVisible: "Activity level: Moderate"
+- assertVisible:
+    id: baseline-summary-sensitive-areas
+- assertVisible: "Sensitive areas: Knee"
+- takeScreenshot: onboarding_baseline_saved

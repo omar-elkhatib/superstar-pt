@@ -4,6 +4,17 @@ import { createDefaultToleranceState } from "./loadModel.mjs";
 const ENTRIES_KEY = "superstar_pt.exercise_entries.v1";
 const TOLERANCE_KEY = "superstar_pt.joint_tolerance.v1";
 const TEMPLATES_KEY = "superstar_pt.exercise_templates.v1";
+const BASELINE_PROFILE_KEY = "superstar_pt.baseline_profile.v1";
+
+export function createDefaultBaselineProfile() {
+  return {
+    completed: false,
+    skipped: false,
+    goals: [],
+    activityLevel: "",
+    sensitiveAreas: []
+  };
+}
 
 export function createMemoryStorage(seed = {}) {
   const map = new Map(Object.entries(seed));
@@ -27,6 +38,29 @@ function parseOrFallback(serialized, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+}
+
+function normalizeBaselineProfile(profile) {
+  const fallback = createDefaultBaselineProfile();
+  const value = profile && typeof profile === "object" ? profile : fallback;
+
+  return {
+    completed: Boolean(value.completed),
+    skipped: Boolean(value.skipped),
+    goals: normalizeStringArray(value.goals),
+    activityLevel: typeof value.activityLevel === "string" ? value.activityLevel.trim() : "",
+    sensitiveAreas: normalizeStringArray(value.sensitiveAreas)
+  };
 }
 
 export function createHistoryStore(storage = createMemoryStorage()) {
@@ -70,6 +104,18 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     storage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
   }
 
+  function getBaselineProfile() {
+    return normalizeBaselineProfile(
+      parseOrFallback(storage.getItem(BASELINE_PROFILE_KEY), createDefaultBaselineProfile())
+    );
+  }
+
+  function setBaselineProfile(profile) {
+    const normalized = normalizeBaselineProfile(profile);
+    storage.setItem(BASELINE_PROFILE_KEY, JSON.stringify(normalized));
+    return normalized;
+  }
+
   return {
     getEntries,
     setEntries,
@@ -78,7 +124,9 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     getToleranceState,
     setToleranceState,
     getTemplates,
-    setTemplates
+    setTemplates,
+    getBaselineProfile,
+    setBaselineProfile
   };
 }
 
