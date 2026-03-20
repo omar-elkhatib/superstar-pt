@@ -12,7 +12,7 @@ import {
   View
 } from "react-native";
 import { TopFeedbackBanner } from "./src/TopFeedbackBanner";
-import { adaptSession } from "./src/adaptivePlan.mjs";
+import { buildDailyPlan } from "./src/adaptivePlan.mjs";
 import {
   buildDailyRecommendationInput,
   resolveTodaysCheckIn,
@@ -26,7 +26,6 @@ import {
   buildDailyRiskGuideFromSummary,
   buildRiskCategoryLegend,
   buildUnifiedLoadChart,
-  buildAdaptiveRecommendation,
   computeEntryJointLoad,
   createDefaultToleranceState,
   JOINT_IDS,
@@ -57,6 +56,23 @@ const JOINT_SERIES_COLORS = {
   wrist: "#4f5a77"
 };
 const UNIFIED_CHART_HEIGHT = 148;
+
+function countRecentSessions(entries, nowIso, windowDays = LOAD_WINDOW_DAYS) {
+  const asOf = Date.parse(nowIso);
+  if (!Number.isFinite(asOf)) {
+    return 0;
+  }
+
+  return entries.filter((entry) => {
+    const performedAt = Date.parse(entry?.performedAtIso);
+    if (!Number.isFinite(performedAt) || performedAt > asOf) {
+      return false;
+    }
+
+    const ageInDays = (asOf - performedAt) / (1000 * 60 * 60 * 24);
+    return ageInDays <= windowDays;
+  }).length;
+}
 
 function formatJointLabel(jointId) {
   return jointId.charAt(0).toUpperCase() + jointId.slice(1);
@@ -156,6 +172,9 @@ export default function App() {
   const [activeView, setActiveView] = useState("main");
   const [sessionPainScore, setSessionPainScore] = useState("4");
   const [checkIns, setCheckIns] = useState(() => appHistoryStore.getCheckIns());
+  const [recommendationSnapshots, setRecommendationSnapshots] = useState(() =>
+    appHistoryStore.getRecommendationSnapshots()
+  );
   const [isCheckInEditorOpen, setIsCheckInEditorOpen] = useState(false);
   const [checkInPainScore, setCheckInPainScore] = useState("4");
   const [checkInReadinessScore, setCheckInReadinessScore] = useState("6");
@@ -223,24 +242,18 @@ export default function App() {
       nowIso: currentNowIso
     });
   }, [checkIns, currentNowIso]);
-
-  const baseRecommendation = useMemo(
-    () =>
-      adaptSession({
-        currentPain: dailyRecommendationInput?.currentPain ?? Number(sessionPainScore) ?? 0,
-        priorPain: dailyRecommendationInput?.priorPain ?? Number(sessionPainScore) ?? 0,
-        readiness: dailyRecommendationInput?.readiness ?? "medium",
-        symptomWorsenedIn24h: dailyRecommendationInput?.symptomWorsenedIn24h ?? false
-      }),
-    [dailyRecommendationInput, sessionPainScore]
-  );
-
-  const recommendation = useMemo(() => {
-    return buildAdaptiveRecommendation({
-      baseRecommendation,
-      loadSummary
+  const dailyRecommendation = useMemo(() => {
+    const recentSessionCount = countRecentSessions(entries, currentNowIso);
+    return buildDailyPlan({
+      checkInInput: dailyRecommendationInput,
+      loadSummary,
+      historySummary: {
+        recentSessionCount,
+        hasRecentHistory: recentSessionCount >= 2
+      },
+      nowIso: currentNowIso
     });
-  }, [baseRecommendation, loadSummary]);
+  }, [currentNowIso, dailyRecommendationInput, entries, loadSummary]);
 
   const dailyLoadSeries = useMemo(() => {
     return buildDailyLoadSeries({
@@ -526,6 +539,7 @@ export default function App() {
   }
 
   function handleSaveDailyCheckIn() {
+    const nowIso = new Date().toISOString();
     const pain = Number(checkInPainScore);
     const readiness = Number(checkInReadinessScore);
     const fatigue = Number(checkInFatigueScore);
@@ -554,10 +568,37 @@ export default function App() {
         fatigueScore: fatigue,
         note: checkInNote
       },
-      { nowIso: new Date().toISOString() }
+      { nowIso }
     );
 
-    setCheckIns(appHistoryStore.getCheckIns());
+    const nextCheckIns = appHistoryStore.getCheckIns();
+    const nextEntries = appHistoryStore.getEntries();
+    const nextRecommendation = buildDailyPlan({
+      checkInInput: buildDailyRecommendationInput({
+        checkIns: nextCheckIns,
+        nowIso
+      }),
+      loadSummary: summarizeRollingLoad({
+        entries: nextEntries,
+        templates: appHistoryStore.getTemplates(),
+        toleranceState: appHistoryStore.getToleranceState(),
+        asOfIso: nowIso,
+        windowDays: LOAD_WINDOW_DAYS,
+        acuteDays: 3
+      }),
+      historySummary: {
+        recentSessionCount: countRecentSessions(nextEntries, nowIso),
+        hasRecentHistory: countRecentSessions(nextEntries, nowIso) >= 2
+      },
+      nowIso
+    });
+
+    if (nextRecommendation) {
+      appHistoryStore.saveRecommendationSnapshot(nextRecommendation, { nowIso });
+    }
+
+    setCheckIns(nextCheckIns);
+    setRecommendationSnapshots(appHistoryStore.getRecommendationSnapshots());
     setCheckInPainScore(String(savedCheckIn.painScore));
     setCheckInReadinessScore(String(savedCheckIn.readinessScore));
     setCheckInFatigueScore(String(savedCheckIn.fatigueScore));
@@ -1252,24 +1293,60 @@ export default function App() {
     <View testID="card-todays-recommendation" style={styles.resultCard} onLayout={captureLayout("recommendation-card")}>
       <Text style={styles.resultTitle}>Suggested Session Guidance</Text>
       <Text testID="recommendation-source-text" style={styles.resultSourceText}>
-        {todaysCheckIn
-          ? "Today's recommendation is based on your current check-in plus recent load."
+        {dailyRecommendation
+          ? dailyRecommendation.sourceText
           : "Save today's check-in to tailor this guidance before training."}
       </Text>
       <Text testID="result-action-label" style={styles.resultItem}>
-        Action: {recommendation.action}
+        Action: {dailyRecommendation?.action || "hold"}
       </Text>
-      <Text style={styles.resultItem}>Intensity: x{recommendation.intensityMultiplier}</Text>
-      <Text style={styles.resultItem}>Overall risk: {loadSummary.overallRisk}</Text>
+      <Text testID="result-activity-type" style={styles.resultItem}>
+        Activity: {dailyRecommendation?.activityType || "Base training"}
+      </Text>
+      <Text style={styles.resultItem}>
+        Intensity: x{dailyRecommendation?.intensityMultiplier || 1}
+      </Text>
+      <Text testID="result-volume-guidance" style={styles.resultItem}>
+        Volume: {dailyRecommendation?.volumeGuidance || "Save today's check-in to unlock guidance."}
+      </Text>
+      <Text style={styles.resultItem}>
+        Overall risk: {dailyRecommendation?.overallRisk || loadSummary.overallRisk}
+      </Text>
       <Text style={styles.resultText}>Top stressed joints: {topJointText || "N/A"}</Text>
-      <Text style={styles.resultText}>{recommendation.recommendation}</Text>
-      {recommendation.overrideApplied ? (
+      <Text testID="result-summary-text" style={styles.resultText}>
+        {dailyRecommendation?.summaryText || "Save today's check-in to tailor today's guidance."}
+      </Text>
+      {dailyRecommendation?.isLowHistoryFallback ? (
+        <Text testID="recommendation-fallback-note" style={styles.overrideNote}>
+          Conservative fallback while recent history builds.
+        </Text>
+      ) : null}
+      {dailyRecommendation?.overrideApplied ? (
         <Text testID="joint-risk-override-note" style={styles.overrideNote}>
           Joint-load override applied due to elevated risk.
         </Text>
       ) : null}
     </View>
   );
+
+  const recommendationHistoryCard = recommendationSnapshots.length > 0 ? (
+    <View testID="card-recommendation-history" style={styles.card}>
+      <Text style={styles.sectionTitle}>Saved Recommendation Snapshots</Text>
+      <Text style={styles.dailyCheckInSubtext}>
+        Review the latest saved daily guidance after each check-in.
+      </Text>
+      {recommendationSnapshots.slice(0, 3).map((snapshot) => (
+        <View key={snapshot.id} testID={`recommendation-snapshot-${snapshot.dayKey}`} style={styles.historyRow}>
+          <Text style={styles.historyTitle}>
+            {formatDayLabel(snapshot.dayKey)} · {snapshot.activityType}
+          </Text>
+          <Text style={styles.historyText}>
+            {snapshot.action} · x{snapshot.intensityMultiplier} · {snapshot.summaryText}
+          </Text>
+        </View>
+      ))}
+    </View>
+  ) : null;
 
   return (
     <SafeAreaView style={styles.root}>
@@ -1300,6 +1377,7 @@ export default function App() {
             {sessionBrowserCard}
             {addSessionCard}
             {recommendationCard}
+            {recommendationHistoryCard}
             <Pressable
               testID="btn-view-visualization"
               onPress={() => handleViewChange("visualization")}
@@ -1319,6 +1397,7 @@ export default function App() {
             </Pressable>
             {loadVisualizationCard}
             {recommendationCard}
+            {recommendationHistoryCard}
           </View>
         )}
       </ScrollView>

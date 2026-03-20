@@ -138,3 +138,46 @@ test("rolling summary excludes entries older than 14 days", () => {
   assert.ok(summary.totalBodyLoad > 0);
   assert.ok(summary.byJoint.ankle.chronicLoad < 1000);
 });
+
+test("history store persists recommendation snapshots and replaces the same day's recommendation", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  const firstSnapshot = store.saveRecommendationSnapshot(
+    {
+      dayKey: "2026-03-20",
+      action: "hold",
+      activityType: "Recovery / technique",
+      intensityMultiplier: 0.85,
+      volumeGuidance: "Keep the session short while the app learns your baseline.",
+      summaryText: "Start with a light session today.",
+      sourceText: "Today's recommendation is based on your check-in because there isn't enough recent history yet.",
+      isLowHistoryFallback: true
+    },
+    { nowIso: "2026-03-20T08:15:00.000Z" }
+  );
+
+  const secondSnapshot = store.saveRecommendationSnapshot(
+    {
+      dayKey: "2026-03-20",
+      action: "regress",
+      activityType: "Recovery / technique",
+      intensityMultiplier: 0.6,
+      volumeGuidance: "Reduce volume sharply and prioritize symptom-calming work.",
+      summaryText: "Switch to low-load recovery work today.",
+      sourceText: "Today's recommendation is based on your current check-in plus recent load.",
+      isLowHistoryFallback: false
+    },
+    { nowIso: "2026-03-20T12:05:00.000Z" }
+  );
+
+  const reloadedStore = createHistoryStore(storage);
+  const snapshots = reloadedStore.getRecommendationSnapshots();
+
+  assert.equal(firstSnapshot.id, "recommendation-2026-03-20");
+  assert.equal(secondSnapshot.id, "recommendation-2026-03-20");
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].summaryText, "Switch to low-load recovery work today.");
+  assert.equal(snapshots[0].updatedAtIso, "2026-03-20T12:05:00.000Z");
+  assert.equal(snapshots[0].isLowHistoryFallback, false);
+});

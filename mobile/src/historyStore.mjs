@@ -4,6 +4,7 @@ import { createDefaultToleranceState } from "./loadModel.mjs";
 
 const ENTRIES_KEY = "superstar_pt.exercise_entries.v1";
 const CHECK_INS_KEY = "superstar_pt.daily_check_ins.v1";
+const RECOMMENDATION_SNAPSHOTS_KEY = "superstar_pt.recommendation_snapshots.v1";
 const TOLERANCE_KEY = "superstar_pt.joint_tolerance.v1";
 const TEMPLATES_KEY = "superstar_pt.exercise_templates.v1";
 
@@ -63,6 +64,14 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     storage.setItem(CHECK_INS_KEY, JSON.stringify(checkIns));
   }
 
+  function getRecommendationSnapshots() {
+    return parseOrFallback(storage.getItem(RECOMMENDATION_SNAPSHOTS_KEY), []);
+  }
+
+  function setRecommendationSnapshots(snapshots) {
+    storage.setItem(RECOMMENDATION_SNAPSHOTS_KEY, JSON.stringify(snapshots));
+  }
+
   function saveDailyCheckIn(values, { nowIso = new Date().toISOString() } = {}) {
     const result = saveDailyCheckInRecord({
       checkIns: getCheckIns(),
@@ -72,6 +81,38 @@ export function createHistoryStore(storage = createMemoryStorage()) {
 
     setCheckIns(result.saved);
     return result.record;
+  }
+
+  function saveRecommendationSnapshot(snapshot, { nowIso = new Date().toISOString() } = {}) {
+    const existingSnapshots = getRecommendationSnapshots();
+    const existing =
+      existingSnapshots.find((item) => item.dayKey === snapshot?.dayKey) || null;
+    const nextSnapshot = {
+      id: existing?.id || snapshot?.id || `recommendation-${snapshot?.dayKey || "unknown"}`,
+      dayKey: snapshot?.dayKey || "",
+      createdAtIso: existing?.createdAtIso || nowIso,
+      updatedAtIso: nowIso,
+      action: snapshot?.action || "hold",
+      activityType: snapshot?.activityType || "Base training",
+      intensityMultiplier: Number(snapshot?.intensityMultiplier) || 0,
+      volumeGuidance: snapshot?.volumeGuidance || "",
+      summaryText: snapshot?.summaryText || "",
+      sourceText: snapshot?.sourceText || "",
+      overallRisk: snapshot?.overallRisk || "unknown",
+      topJoint: snapshot?.topJoint || null,
+      recentSessionCount: Number(snapshot?.recentSessionCount || 0),
+      isLowHistoryFallback: Boolean(snapshot?.isLowHistoryFallback),
+      overrideApplied: Boolean(snapshot?.overrideApplied),
+      overrideReason: snapshot?.overrideReason || null
+    };
+
+    const remaining = existingSnapshots.filter((item) => item.dayKey !== nextSnapshot.dayKey);
+    const saved = [...remaining, nextSnapshot].sort((a, b) => {
+      return Date.parse(b.updatedAtIso) - Date.parse(a.updatedAtIso);
+    });
+
+    setRecommendationSnapshots(saved);
+    return nextSnapshot;
   }
 
   function getToleranceState() {
@@ -98,7 +139,10 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     deleteEntry,
     getCheckIns,
     setCheckIns,
+    getRecommendationSnapshots,
+    setRecommendationSnapshots,
     saveDailyCheckIn,
+    saveRecommendationSnapshot,
     getToleranceState,
     setToleranceState,
     getTemplates,

@@ -47,4 +47,16 @@ appId: com.omarelkhatib.superstarpt
     id: recommendation-source-text
 - assertVisible:
     id: result-action-label
+- assertVisible:
+    id: result-activity-type
+- assertVisible:
+    id: result-volume-guidance
+- assertVisible:
+    id: result-summary-text
+- assertVisible:
+    id: recommendation-fallback-note
+- assertVisible:
+    id: card-recommendation-history
+- assertVisible:
+    id: recommendation-snapshot-2026-03-20
 - takeScreenshot: daily_checkin_complete_state
