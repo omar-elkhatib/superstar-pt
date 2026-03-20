@@ -3,6 +3,7 @@
 ## UI Verification Requirement (Top-Level)
 
 1. For any UI-impacting change, include screenshot-based verification checks (iOS simulator screenshots and/or Maestro screenshot assertions) to confirm the UI behaves and renders as intended before completion.
+2. In the current Linux Gas Town VM, do not attempt to resolve `mobile:verify`, Expo CLI doctor failures, iOS bundle checks, simulator validation, or Maestro screenshot flows. Those toolchains are unavailable here, so agents must record the limitation and continue with logic-level verification only.
 
 ## Engineering Workflow Rules
 
@@ -19,6 +20,7 @@
 1. Run root logic tests: `npm test`
 2. Run mobile tests: `npm run mobile:test`
 3. Run full mobile preflight before phone testing: `npm run mobile:verify`
+   Do not treat this as actionable in the current Linux Gas Town VM; `expo`, iOS simulator tooling, and Maestro UI verification are unavailable here.
 4. Run both root + mobile tests together when needed: `npm run test:all`
 5. Before iOS simulator tests, verify tooling: `xcodebuild -version && xcrun simctl list devices && pod --version`
 6. Run iOS simulator unit-test validation to completion: `cd mobile/ios && xcodebuild test -workspace SuperstarPT.xcworkspace -scheme SuperstarPT -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.derived-data -only-testing:SuperstarPTTests`
