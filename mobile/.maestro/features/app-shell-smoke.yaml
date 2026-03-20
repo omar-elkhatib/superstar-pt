@@ -1,0 +1,37 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- assertVisible:
+    id: app-shell-nav
+- assertVisible:
+    id: screen-home
+- assertVisible:
+    id: card-daily-checkin
+- takeScreenshot: app_shell_home
+- tapOn:
+    id: btn-nav-log
+- assertVisible:
+    id: screen-log
+- assertVisible:
+    id: card-add-session
+- takeScreenshot: app_shell_log
+- tapOn:
+    id: btn-nav-history
+- assertVisible:
+    id: screen-history
+- assertVisible:
+    id: card-session-browser
+- takeScreenshot: app_shell_history
+- tapOn:
+    id: btn-nav-insights
+- assertVisible:
+    id: screen-insights
+- assertVisible:
+    id: view-joint-load-visualization
+- assertVisible:
+    id: card-todays-recommendation
+- takeScreenshot: app_shell_insights
+- tapOn:
+    id: btn-nav-home
+- assertVisible:
+    id: screen-home

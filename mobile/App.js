@@ -42,6 +42,15 @@ import {
   computeKeyboardAwareScrollOffset,
   computeRevealScrollOffset
 } from "./src/scrollBehavior.mjs";
+import {
+  APP_SHELL_SCREENS,
+  buildScreenVisibilityMap,
+  DEFAULT_APP_SCREEN
+} from "./src/appShellModel.mjs";
+import { HomeScreen } from "./src/screens/HomeScreen";
+import { LogScreen } from "./src/screens/LogScreen";
+import { HistoryScreen } from "./src/screens/HistoryScreen";
+import { InsightsScreen } from "./src/screens/InsightsScreen";
 
 const VARIANT_OPTIONS = ["base", "seated", "supported"];
 const LOAD_WINDOW_DAYS = 14;
@@ -169,7 +178,7 @@ function formatTopJointLoads(computed) {
 }
 
 export default function App() {
-  const [activeView, setActiveView] = useState("main");
+  const [activeView, setActiveView] = useState(DEFAULT_APP_SCREEN);
   const [sessionPainScore, setSessionPainScore] = useState("4");
   const [checkIns, setCheckIns] = useState(() => appHistoryStore.getCheckIns());
   const [recommendationSnapshots, setRecommendationSnapshots] = useState(() =>
@@ -1347,6 +1356,7 @@ export default function App() {
       ))}
     </View>
   ) : null;
+  const screenVisibility = buildScreenVisibilityMap(activeView);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -1370,36 +1380,54 @@ export default function App() {
           Superstar PT
         </Text>
         <Text style={styles.subtitle}>Session browser + adaptive load intelligence</Text>
+        <View testID="app-shell-nav" style={styles.viewToggleRow}>
+          {APP_SHELL_SCREENS.map((screen) => {
+            const isActive = activeView === screen.id;
+            return (
+              <Pressable
+                key={screen.id}
+                testID={`btn-nav-${screen.id}`}
+                onPress={() => handleViewChange(screen.id)}
+                style={[
+                  styles.viewToggle,
+                  isActive ? styles.viewToggleActive : styles.viewToggleInactive
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.viewToggleText,
+                    isActive ? styles.viewToggleTextActive : styles.viewToggleTextInactive
+                  ]}
+                >
+                  {screen.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-        {activeView === "main" ? (
-          <>
-            {dailyCheckInCard}
-            {sessionBrowserCard}
-            {addSessionCard}
-            {recommendationCard}
-            {recommendationHistoryCard}
-            <Pressable
-              testID="btn-view-visualization"
-              onPress={() => handleViewChange("visualization")}
-              style={styles.visualizationShortcut}
-            >
-              <Text style={styles.visualizationShortcutText}>Open joint-load visualization</Text>
-            </Pressable>
-          </>
-        ) : (
-          <View testID="view-joint-load-visualization" style={styles.visualizationView}>
-            <Pressable
-              testID="btn-view-main"
-              onPress={() => handleViewChange("main")}
-              style={styles.visualizationShortcut}
-            >
-              <Text style={styles.visualizationShortcutText}>Back to sessions</Text>
-            </Pressable>
-            {loadVisualizationCard}
-            {recommendationCard}
-            {recommendationHistoryCard}
-          </View>
-        )}
+        <HomeScreen
+          isVisible={screenVisibility.home.isVisible}
+          dailyCheckInCard={dailyCheckInCard}
+          recommendationCard={recommendationCard}
+          recommendationHistoryCard={recommendationHistoryCard}
+          onOpenInsights={() => handleViewChange("insights")}
+        />
+        <LogScreen
+          isVisible={screenVisibility.log.isVisible}
+          addSessionCard={addSessionCard}
+        />
+        <HistoryScreen
+          isVisible={screenVisibility.history.isVisible}
+          sessionBrowserCard={sessionBrowserCard}
+        />
+        <InsightsScreen
+          isVisible={screenVisibility.insights.isVisible}
+          loadVisualizationCard={loadVisualizationCard}
+          recommendationCard={recommendationCard}
+          recommendationHistoryCard={recommendationHistoryCard}
+          onOpenHome={() => handleViewChange("home")}
+        />
       </ScrollView>
       <View pointerEvents="box-none" style={styles.feedbackOverlay}>
         <TopFeedbackBanner notice={feedbackNotice} />
