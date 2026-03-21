@@ -39,6 +39,36 @@ test("daily plan falls back to a conservative recommendation when recent history
   assert.equal(result.isLowHistoryFallback, true);
 });
 
+test("daily plan can use saved onboarding baseline as low-history context", () => {
+  const result = buildDailyPlan({
+    checkInInput: {
+      currentPain: 2,
+      priorPain: 2,
+      readiness: "medium",
+      symptomWorsenedIn24h: false
+    },
+    loadSummary: {
+      overallRisk: "low",
+      topStressedJoints: []
+    },
+    historySummary: {
+      recentSessionCount: 0,
+      hasRecentHistory: false
+    },
+    baselineProfile: {
+      completed: true,
+      skipped: false,
+      goals: ["move-with-less-pain"],
+      activityLevel: "moderate",
+      sensitiveAreas: ["knee"]
+    },
+    nowIso: "2026-03-20T08:15:00.000Z"
+  });
+
+  assert.match(result.sourceText, /onboarding baseline/i);
+  assert.equal(result.isLowHistoryFallback, true);
+});
+
 test("daily plan combines current check-in and load risk into a persisted-ready recommendation", () => {
   const result = buildDailyPlan({
     checkInInput: {

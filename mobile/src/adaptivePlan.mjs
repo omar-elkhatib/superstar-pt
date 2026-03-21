@@ -89,6 +89,7 @@ export function buildDailyPlan({
   checkInInput,
   loadSummary,
   historySummary,
+  baselineProfile,
   nowIso
 }) {
   if (!checkInInput) {
@@ -157,7 +158,9 @@ export function buildDailyPlan({
     summaryText: finalPlan.recommendation,
     sourceText: hasRecentHistory
       ? "Today's recommendation is based on your current check-in plus recent load."
-      : "Today's recommendation is based on your check-in because there isn't enough recent history yet.",
+      : baselineProfile?.completed && !baselineProfile?.skipped
+        ? "Today's recommendation is based on your check-in and onboarding baseline because there isn't enough recent history yet."
+        : "Today's recommendation is based on your check-in because there isn't enough recent history yet.",
     overallRisk: hasRecentHistory ? loadSummary?.overallRisk || "low" : "unknown",
     topJoint: hasRecentHistory ? loadSummary?.topStressedJoints?.[0]?.jointId || null : null,
     recentSessionCount: Number(historySummary?.recentSessionCount || 0),

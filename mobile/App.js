@@ -53,6 +53,12 @@ import { HistoryScreen } from "./src/screens/HistoryScreen";
 import { InsightsScreen } from "./src/screens/InsightsScreen";
 
 const VARIANT_OPTIONS = ["base", "seated", "supported"];
+const BASELINE_GOAL_OPTIONS = [
+  "move-with-less-pain",
+  "build-consistency",
+  "return-to-running"
+];
+const BASELINE_ACTIVITY_LEVEL_OPTIONS = ["low", "moderate", "high"];
 const LOAD_WINDOW_DAYS = 14;
 const JOINT_SERIES_COLORS = {
   ankle: "#2d77d1",
@@ -85,6 +91,13 @@ function countRecentSessions(entries, nowIso, windowDays = LOAD_WINDOW_DAYS) {
 
 function formatJointLabel(jointId) {
   return jointId.charAt(0).toUpperCase() + jointId.slice(1);
+}
+
+function formatOptionLabel(value) {
+  return String(value || "")
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatDayLabel(dayKey) {
@@ -180,6 +193,10 @@ function formatTopJointLoads(computed) {
 export default function App() {
   const [activeView, setActiveView] = useState(DEFAULT_APP_SCREEN);
   const [sessionPainScore, setSessionPainScore] = useState("4");
+  const [baselineProfile, setBaselineProfile] = useState(() =>
+    appHistoryStore.getBaselineProfile()
+  );
+  const [baselineError, setBaselineError] = useState("");
   const [checkIns, setCheckIns] = useState(() => appHistoryStore.getCheckIns());
   const [recommendationSnapshots, setRecommendationSnapshots] = useState(() =>
     appHistoryStore.getRecommendationSnapshots()
@@ -260,9 +277,10 @@ export default function App() {
         recentSessionCount,
         hasRecentHistory: recentSessionCount >= 2
       },
+      baselineProfile,
       nowIso: currentNowIso
     });
-  }, [currentNowIso, dailyRecommendationInput, entries, loadSummary]);
+  }, [baselineProfile, currentNowIso, dailyRecommendationInput, entries, loadSummary]);
 
   const dailyLoadSeries = useMemo(() => {
     return buildDailyLoadSeries({
@@ -599,6 +617,7 @@ export default function App() {
         recentSessionCount: countRecentSessions(nextEntries, nowIso),
         hasRecentHistory: countRecentSessions(nextEntries, nowIso) >= 2
       },
+      baselineProfile,
       nowIso
     });
 
@@ -622,6 +641,70 @@ export default function App() {
 
     requestAnimationFrame(() => {
       scrollToLayout("recommendation-card");
+    });
+  }
+
+  function toggleBaselineSelection(field, value) {
+    setBaselineError("");
+    setBaselineProfile((current) => {
+      const currentValues = Array.isArray(current[field]) ? current[field] : [];
+      const nextValues = currentValues.includes(value)
+        ? currentValues.filter((item) => item !== value)
+        : [...currentValues, value];
+
+      return {
+        ...current,
+        [field]: nextValues
+      };
+    });
+  }
+
+  function handleActivityLevelChange(value) {
+    setBaselineError("");
+    setBaselineProfile((current) => ({
+      ...current,
+      activityLevel: current.activityLevel === value ? "" : value
+    }));
+  }
+
+  function handleCompleteBaseline() {
+    if (baselineProfile.goals.length === 0 || !baselineProfile.activityLevel) {
+      const message = "Pick at least one goal and an activity level, or skip for now.";
+      setBaselineError(message);
+      emitFeedback({
+        type: "session_validation_error",
+        message
+      });
+      return;
+    }
+
+    const savedProfile = appHistoryStore.setBaselineProfile({
+      ...baselineProfile,
+      completed: true,
+      skipped: false
+    });
+    setBaselineProfile(savedProfile);
+    setBaselineError("");
+    emitFeedback({
+      type: "session_added",
+      templateId: "baseline"
+    });
+  }
+
+  function handleSkipBaseline() {
+    const savedProfile = appHistoryStore.setBaselineProfile({
+      completed: true,
+      skipped: true,
+      goals: [],
+      activityLevel: "",
+      sensitiveAreas: []
+    });
+    setBaselineProfile(savedProfile);
+    setBaselineError("");
+    emitFeedback({
+      type: "view_change",
+      from: "baseline",
+      to: activeView
     });
   }
 
@@ -1048,6 +1131,110 @@ export default function App() {
     </View>
   );
 
+  const onboardingBaselineCard = !baselineProfile.completed ? (
+    <View testID="card-onboarding-baseline" style={[styles.card, styles.onboardingCard]}>
+      <Text testID="screen-onboarding-title" style={styles.sectionTitle}>
+        Quick Baseline
+      </Text>
+      <Text style={styles.dailyCheckInSubtext}>
+        Add a little starting context so first-day guidance is less generic. You can skip this and
+        use the app normally.
+      </Text>
+
+      <View>
+        <Text style={styles.label}>Goals</Text>
+        <View style={styles.wrapRow}>
+          {BASELINE_GOAL_OPTIONS.map((goal) => {
+            const isActive = baselineProfile.goals.includes(goal);
+            return (
+              <Pressable
+                key={goal}
+                testID={`btn-onboarding-goal-${goal}`}
+                onPress={() => toggleBaselineSelection("goals", goal)}
+                style={[styles.pill, isActive ? styles.pillActive : styles.pillInactive]}
+              >
+                <Text
+                  style={[styles.pillText, isActive ? styles.pillTextActive : styles.pillTextInactive]}
+                >
+                  {formatOptionLabel(goal)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Activity level</Text>
+        <View style={styles.row}>
+          {BASELINE_ACTIVITY_LEVEL_OPTIONS.map((level) => {
+            const isActive = baselineProfile.activityLevel === level;
+            return (
+              <Pressable
+                key={level}
+                testID={`btn-onboarding-activity-${level}`}
+                onPress={() => handleActivityLevelChange(level)}
+                style={[styles.pill, isActive ? styles.pillActive : styles.pillInactive]}
+              >
+                <Text
+                  style={[styles.pillText, isActive ? styles.pillTextActive : styles.pillTextInactive]}
+                >
+                  {formatOptionLabel(level)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Sensitive areas</Text>
+        <View style={styles.wrapRow}>
+          {JOINT_IDS.map((jointId) => {
+            const isActive = baselineProfile.sensitiveAreas.includes(jointId);
+            return (
+              <Pressable
+                key={jointId}
+                testID={`btn-onboarding-sensitive-${jointId}`}
+                onPress={() => toggleBaselineSelection("sensitiveAreas", jointId)}
+                style={[styles.pill, isActive ? styles.pillActive : styles.pillInactive]}
+              >
+                <Text
+                  style={[styles.pillText, isActive ? styles.pillTextActive : styles.pillTextInactive]}
+                >
+                  {formatJointLabel(jointId)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {baselineError ? (
+        <Text testID="onboarding-error-text" style={styles.errorText}>
+          {baselineError}
+        </Text>
+      ) : null}
+
+      <View style={styles.dailyEditorActionRow}>
+        <Pressable
+          testID="btn-onboarding-complete"
+          onPress={handleCompleteBaseline}
+          style={styles.quickAddButton}
+        >
+          <Text style={styles.quickAddButtonText}>Save baseline</Text>
+        </Pressable>
+        <Pressable
+          testID="btn-onboarding-skip"
+          onPress={handleSkipBaseline}
+          style={styles.secondaryActionButton}
+        >
+          <Text style={styles.secondaryActionButtonText}>Skip for now</Text>
+        </Pressable>
+      </View>
+    </View>
+  ) : null;
+
   const sessionBrowserCard = (
     <View testID="card-session-browser" style={styles.card}>
       <View testID="session-browser-header" style={styles.sessionBrowserHeader}>
@@ -1408,6 +1595,7 @@ export default function App() {
 
         <HomeScreen
           isVisible={screenVisibility.home.isVisible}
+          onboardingBaselineCard={onboardingBaselineCard}
           dailyCheckInCard={dailyCheckInCard}
           recommendationCard={recommendationCard}
           recommendationHistoryCard={recommendationHistoryCard}
@@ -1450,6 +1638,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 28,
     gap: 18
+  },
+  onboardingCard: {
+    borderWidth: 1,
+    borderColor: "#cfe4d9",
+    backgroundColor: "#f9fcfa"
   },
   title: { fontSize: 34, fontWeight: "700", color: "#0d3b2a" },
   subtitle: { fontSize: 16, color: "#245f48" },

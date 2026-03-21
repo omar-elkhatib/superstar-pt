@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export function HomeScreen({
   isVisible,
+  onboardingBaselineCard,
   dailyCheckInCard,
   recommendationCard,
   recommendationHistoryCard,
@@ -13,6 +14,7 @@ export function HomeScreen({
       style={[styles.screen, !isVisible ? styles.screenHidden : null]}
       pointerEvents={isVisible ? "auto" : "none"}
     >
+      {onboardingBaselineCard}
       {dailyCheckInCard}
       {recommendationCard}
       {recommendationHistoryCard}
@@ -39,4 +41,3 @@ const styles = StyleSheet.create({
   },
   shortcutButtonText: { color: "#1d4c38", fontWeight: "700" }
 });
-

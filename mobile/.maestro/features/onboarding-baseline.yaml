@@ -1,0 +1,15 @@
+appId: com.omarelkhatib.superstarpt
+---
+- runFlow: ../fixtures/session-start.yaml
+- assertVisible:
+    id: card-onboarding-baseline
+- tapOn:
+    id: btn-onboarding-goal-move-with-less-pain
+- tapOn:
+    id: btn-onboarding-activity-moderate
+- tapOn:
+    id: btn-onboarding-sensitive-knee
+- tapOn:
+    id: btn-onboarding-complete
+- assertNotVisible:
+    id: card-onboarding-baseline

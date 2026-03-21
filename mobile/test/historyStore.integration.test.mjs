@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  createDefaultBaselineProfile,
   createHistoryStore,
   createMemoryStorage
 } from "../src/historyStore.mjs";
@@ -180,4 +181,50 @@ test("history store persists recommendation snapshots and replaces the same day'
   assert.equal(snapshots[0].summaryText, "Switch to low-load recovery work today.");
   assert.equal(snapshots[0].updatedAtIso, "2026-03-20T12:05:00.000Z");
   assert.equal(snapshots[0].isLowHistoryFallback, false);
+});
+
+test("history store persists completed onboarding baseline across reloads", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  store.setBaselineProfile({
+    completed: true,
+    skipped: false,
+    goals: ["move-with-less-pain", "return-to-running"],
+    activityLevel: "moderate",
+    sensitiveAreas: ["knee", "ankle"]
+  });
+
+  const reloadedStore = createHistoryStore(storage);
+  assert.deepEqual(reloadedStore.getBaselineProfile(), {
+    completed: true,
+    skipped: false,
+    goals: ["move-with-less-pain", "return-to-running"],
+    activityLevel: "moderate",
+    sensitiveAreas: ["knee", "ankle"]
+  });
+});
+
+test("history store supports skipped onboarding without blocking app use", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  assert.deepEqual(store.getBaselineProfile(), createDefaultBaselineProfile());
+
+  store.setBaselineProfile({
+    completed: true,
+    skipped: true,
+    goals: [],
+    activityLevel: "",
+    sensitiveAreas: []
+  });
+
+  const reloadedStore = createHistoryStore(storage);
+  assert.deepEqual(reloadedStore.getBaselineProfile(), {
+    completed: true,
+    skipped: true,
+    goals: [],
+    activityLevel: "",
+    sensitiveAreas: []
+  });
 });
