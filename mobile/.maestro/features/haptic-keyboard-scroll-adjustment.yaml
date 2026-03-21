@@ -1,12 +1,13 @@
 appId: com.omarelkhatib.superstarpt
 ---
 - runFlow: ../fixtures/session-start.yaml
+- runFlow: ../fixtures/open-log-screen.yaml
 - scrollUntilVisible:
     element:
-      id: btn-feedback-joint-shoulder
+      id: btn-feedback-joint-knee
     direction: DOWN
 - tapOn:
-    id: btn-feedback-joint-shoulder
+    id: btn-feedback-joint-knee
 - scrollUntilVisible:
     element:
       id: input-joint-feedback

@@ -1,0 +1,6 @@
+appId: com.omarelkhatib.superstarpt
+---
+- tapOn:
+    id: btn-nav-insights
+- assertVisible:
+    id: screen-insights

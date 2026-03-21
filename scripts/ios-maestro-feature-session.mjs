@@ -8,13 +8,15 @@ import {
   inferFeatureName,
   resolveFeatureFlowInput
 } from "./ios-maestro-feature-lib.mjs";
+import { buildMaestroEnv, buildMaestroHomePath } from "./ios-maestro-run-lib.mjs";
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
 function run(command, args, options = {}) {
   execFileSync(command, args, {
     cwd: options.cwd || repoRoot,
-    stdio: "inherit"
+    stdio: "inherit",
+    env: options.env || process.env
   });
 }
 
@@ -50,7 +52,9 @@ try {
 
   const featureName = inferFeatureName(flowPath);
   const artifactPaths = buildFeatureArtifactPaths({ repoRoot, featureName });
+  const maestroHome = buildMaestroHomePath({ repoRoot, env: process.env });
   ensureArtifactDirectories(artifactPaths);
+  fs.mkdirSync(maestroHome, { recursive: true });
 
   const maestroArgs = buildMaestroFeatureTestArgs({ flowPath, artifactPaths });
 
@@ -58,7 +62,9 @@ try {
   console.log(`Flow path: ${flowPath}`);
 
   runNpmScript("ios:maestro:prepare");
-  run("maestro", maestroArgs);
+  run("maestro", maestroArgs, {
+    env: buildMaestroEnv({ repoRoot, env: process.env })
+  });
 } catch (error) {
   console.error(error.message || String(error));
   exitCode = getExitCode(error);

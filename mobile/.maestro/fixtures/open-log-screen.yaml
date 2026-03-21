@@ -1,0 +1,6 @@
+appId: com.omarelkhatib.superstarpt
+---
+- tapOn:
+    id: btn-nav-log
+- assertVisible:
+    id: screen-log

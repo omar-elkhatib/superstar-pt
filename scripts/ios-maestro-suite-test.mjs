@@ -2,6 +2,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { buildMaestroEnv, buildMaestroHomePath } from "./ios-maestro-run-lib.mjs";
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
@@ -33,9 +34,11 @@ function runSuite({ name, target }) {
   const resultsXml = path.join(outputRoot, "results.xml");
   const artifactsDir = path.join(outputRoot, "artifacts");
   const debugDir = path.join(outputRoot, "debug");
+  const maestroHome = buildMaestroHomePath({ repoRoot, env: process.env });
 
   fs.mkdirSync(artifactsDir, { recursive: true });
   fs.mkdirSync(debugDir, { recursive: true });
+  fs.mkdirSync(maestroHome, { recursive: true });
 
   const args = [
     "-p",
@@ -56,7 +59,8 @@ function runSuite({ name, target }) {
   console.log(`Running Maestro suite: ${name}`);
   execFileSync("maestro", args, {
     cwd: repoRoot,
-    stdio: "inherit"
+    stdio: "inherit",
+    env: buildMaestroEnv({ repoRoot, env: process.env })
   });
 }
 

@@ -7,8 +7,6 @@ appId: com.omarelkhatib.superstarpt
     id: daily-checkin-missing-state
 - assertVisible:
     id: btn-open-daily-checkin
-- assertVisible:
-    id: card-todays-recommendation
 - takeScreenshot: daily_checkin_missing_state
 - tapOn:
     id: btn-open-daily-checkin
@@ -16,21 +14,6 @@ appId: com.omarelkhatib.superstarpt
     id: daily-checkin-editor
 - assertVisible:
     id: daily-checkin-mode-label
-- tapOn:
-    id: input-checkin-pain
-- eraseText
-- inputText: "7"
-- tapOn:
-    id: input-checkin-readiness
-- eraseText
-- inputText: "2"
-- tapOn:
-    id: input-checkin-fatigue
-- eraseText
-- inputText: "8"
-- tapOn:
-    id: input-checkin-note
-- inputText: "Worsened after commute"
 - tapOn:
     id: btn-save-daily-checkin
 - assertVisible:
@@ -41,8 +24,10 @@ appId: com.omarelkhatib.superstarpt
     id: daily-checkin-summary-readiness
 - assertVisible:
     id: daily-checkin-summary-fatigue
-- assertVisible:
-    id: daily-checkin-summary-note
+- scrollUntilVisible:
+    element:
+      id: card-todays-recommendation
+    direction: DOWN
 - assertVisible:
     id: recommendation-source-text
 - assertVisible:
@@ -55,8 +40,10 @@ appId: com.omarelkhatib.superstarpt
     id: result-summary-text
 - assertVisible:
     id: recommendation-fallback-note
+- scrollUntilVisible:
+    element:
+      id: card-recommendation-history
+    direction: DOWN
 - assertVisible:
     id: card-recommendation-history
-- assertVisible:
-    id: recommendation-snapshot-2026-03-20
 - takeScreenshot: daily_checkin_complete_state

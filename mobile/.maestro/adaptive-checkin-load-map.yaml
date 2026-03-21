@@ -1,13 +1,15 @@
 appId: com.omarelkhatib.superstarpt
 ---
 - runFlow: fixtures/session-start.yaml
+- runFlow: fixtures/open-history-screen.yaml
 - assertVisible:
     id: card-session-browser
+- takeScreenshot: home_session_browser
+- runFlow: fixtures/open-log-screen.yaml
 - assertVisible:
     id: card-add-session
 - assertVisible:
     id: input-session-pain
-- takeScreenshot: home_session_browser
 - assertVisible:
     id: btn-add-session
 - tapOn:
@@ -15,17 +17,13 @@ appId: com.omarelkhatib.superstarpt
 - assertVisible:
     id: feedback-banner
 - takeScreenshot: add_session_overlay_banner
+- runFlow: fixtures/open-history-screen.yaml
 - assertVisible:
     id: session-browser-count
 - assertVisible: 1 saved
 - assertVisible:
     id: session-detail-card
-- scrollUntilVisible:
-    element:
-      id: btn-view-visualization
-    direction: DOWN
-- tapOn:
-    id: btn-view-visualization
+- runFlow: fixtures/open-insights-screen.yaml
 - assertVisible:
     id: view-joint-load-visualization
 - assertVisible:
@@ -34,7 +32,7 @@ appId: com.omarelkhatib.superstarpt
 - tapOn:
     id: btn-view-main
 - assertVisible:
-    id: card-session-browser
+    id: screen-home
 - assertVisible:
-    id: card-add-session
+    id: card-daily-checkin
 - takeScreenshot: back_to_main_layout

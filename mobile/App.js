@@ -633,7 +633,7 @@ export default function App() {
     setCheckInNote(savedCheckIn.note || "");
     setCheckInError("");
     setIsCheckInEditorOpen(false);
-    setActiveView("main");
+    setActiveView(DEFAULT_APP_SCREEN);
     emitFeedback({
       type: "session_added",
       templateId: "daily-checkin"
