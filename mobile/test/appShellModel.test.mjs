@@ -3,36 +3,60 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  APP_SHELL_SCREENS,
-  DEFAULT_APP_SCREEN,
-  buildScreenVisibilityMap,
-  getScreenDefinition
-} from "../src/appShellModel.mjs";
+  APP_TAB_ROUTES,
+  DEFAULT_TAB_ROUTE,
+  getTabRoute
+} from "../src/navigation/routeContracts.mjs";
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
-test("app shell defaults to Home and exposes the planned top-level destinations", () => {
-  assert.equal(DEFAULT_APP_SCREEN, "home");
+test("navigation contracts freeze the top-level tabs and default to TodayTab", () => {
+  assert.equal(DEFAULT_TAB_ROUTE, "TodayTab");
   assert.deepEqual(
-    APP_SHELL_SCREENS.map((screen) => screen.id),
-    ["home", "log", "history", "insights"]
+    APP_TAB_ROUTES.map((route) => route.name),
+    ["TodayTab", "LogTab", "ProgressTab"]
   );
-  assert.equal(getScreenDefinition("insights").label, "Insights");
+  assert.deepEqual(
+    APP_TAB_ROUTES.map((route) => route.stackName),
+    ["TodayStack", "LogStack", "ProgressStack"]
+  );
+  assert.deepEqual(
+    APP_TAB_ROUTES.map((route) => route.testID),
+    ["shell-tab-today", "shell-tab-log", "shell-tab-progress"]
+  );
+  assert.equal(getTabRoute("ProgressTab").label, "Progress");
 });
 
-test("screen visibility map keeps every destination mounted while marking only the active screen visible", () => {
-  const visibility = buildScreenVisibilityMap("history");
-
-  assert.deepEqual(Object.keys(visibility), ["home", "log", "history", "insights"]);
-  assert.equal(visibility.home.isVisible, false);
-  assert.equal(visibility.log.isVisible, false);
-  assert.equal(visibility.history.isVisible, true);
-  assert.equal(visibility.insights.isVisible, false);
-});
-
-test("daily check-in save does not send the shell back to a legacy main route", () => {
+test("App bootstrap delegates shell rendering to the navigator and safe-area banner host", () => {
   const appSource = fs.readFileSync(path.join(repoRoot, "App.js"), "utf8");
 
-  assert.doesNotMatch(appSource, /setActiveView\("main"\)/);
-  assert.match(appSource, /setActiveView\(DEFAULT_APP_SCREEN\)|setActiveView\("home"\)/);
+  assert.match(appSource, /SafeAreaProvider/);
+  assert.match(appSource, /AppNavigator/);
+  assert.match(appSource, /TopFeedbackBanner/);
+  assert.doesNotMatch(appSource, /appShellModel\.mjs/);
+  assert.doesNotMatch(appSource, /setActiveView\(/);
+});
+
+test("placeholder screens exist for each top-level destination", () => {
+  const placeholders = [
+    ["src/screens/today/TodayScreen.js", "TodayScreen"],
+    ["src/screens/log/LogScreen.js", "LogScreen"],
+    ["src/screens/progress/ProgressScreen.js", "ProgressScreen"]
+  ];
+
+  for (const [relativePath, exportName] of placeholders) {
+    const screenSource = fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
+
+    assert.match(screenSource, new RegExp(`export function ${exportName}\\b`));
+  }
+});
+
+test("mobile package declares the navigation shell dependencies", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+
+  assert.ok(pkg.dependencies["@react-navigation/native"]);
+  assert.ok(pkg.dependencies["@react-navigation/bottom-tabs"]);
+  assert.ok(pkg.dependencies["@react-navigation/native-stack"]);
+  assert.ok(pkg.dependencies["react-native-safe-area-context"]);
+  assert.ok(pkg.dependencies["react-native-screens"]);
 });
