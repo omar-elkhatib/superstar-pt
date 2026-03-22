@@ -33,6 +33,35 @@ test("history store persists entries and tolerance state", () => {
   assert.equal(store2.getToleranceState().factors.knee, 0.8);
 });
 
+test("history store persists custom activity details and session notes across reloads", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  store.addEntry({
+    id: "custom-note-1",
+    templateId: "custom_activity",
+    customActivity: {
+      name: "Band mobility",
+      bodyRegion: "mobility",
+      primaryJoint: "shoulder"
+    },
+    sessionNote: "Stopped early when the left shoulder pinched on rep 8.",
+    performedAtIso: "2026-02-28T10:00:00.000Z",
+    durationMinutes: 12,
+    effortScore: 3,
+    variant: "supported",
+    completionStatus: "partial"
+  });
+
+  const reloadedStore = createHistoryStore(storage);
+  const [savedEntry] = reloadedStore.getEntries();
+
+  assert.equal(savedEntry.customActivity.name, "Band mobility");
+  assert.equal(savedEntry.customActivity.primaryJoint, "shoulder");
+  assert.equal(savedEntry.sessionNote, "Stopped early when the left shoulder pinched on rep 8.");
+  assert.equal(savedEntry.completionStatus, "partial");
+});
+
 test("history store persists deleted entries across reloads", () => {
   const storage = createMemoryStorage();
   const store = createHistoryStore(storage);

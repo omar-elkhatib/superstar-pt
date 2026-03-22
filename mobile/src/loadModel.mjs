@@ -1,3 +1,5 @@
+import { resolveTemplateForEntry } from "./activityEntryMetadata.mjs";
+
 export const JOINT_IDS = [
   "ankle",
   "knee",
@@ -107,7 +109,6 @@ export function buildDailyLoadSeries({ entries, templates, asOfIso }) {
     return { days: [] };
   }
 
-  const templateById = new Map((templates || []).map((item) => [item.id, item]));
   const aggregatesByDay = new Map();
   let earliestDayKey = null;
 
@@ -117,7 +118,7 @@ export function buildDailyLoadSeries({ entries, templates, asOfIso }) {
       continue;
     }
 
-    const template = templateById.get(entry.templateId);
+    const template = resolveTemplateForEntry({ entry, templates });
     if (!template) {
       continue;
     }
@@ -329,7 +330,6 @@ export function summarizeRollingLoad({
   windowDays = 14,
   acuteDays = 3
 }) {
-  const templateById = new Map(templates.map((item) => [item.id, item]));
   const byJoint = {};
 
   for (const jointId of JOINT_IDS) {
@@ -347,7 +347,7 @@ export function summarizeRollingLoad({
   const recentEntries = entries.filter((entry) => isInWindow(entry.performedAtIso, asOfIso, windowDays));
 
   for (const entry of recentEntries) {
-    const template = templateById.get(entry.templateId);
+    const template = resolveTemplateForEntry({ entry, templates });
     if (!template) {
       continue;
     }

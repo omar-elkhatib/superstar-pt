@@ -52,6 +52,12 @@ import {
   buildRecommendationLogDraft,
   resolveEntryRecommendation
 } from "./src/recommendationLogging.mjs";
+import {
+  CUSTOM_ACTIVITY_BODY_REGION_OPTIONS,
+  CUSTOM_ACTIVITY_TEMPLATE_ID,
+  getEntryActivityLabel,
+  resolveTemplateForEntry
+} from "./src/activityEntryMetadata.mjs";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { LogScreen } from "./src/screens/LogScreen";
 import { HistoryScreen } from "./src/screens/HistoryScreen";
@@ -115,6 +121,8 @@ function formatDayLabel(dayKey) {
 
 function formatCompletionStatus(status) {
   switch (status) {
+    case "skipped":
+      return "Skipped";
     case "partial":
       return "Partially completed";
     case "completed":
@@ -250,6 +258,10 @@ export default function App() {
   const [completionStatus, setCompletionStatus] = useState("completed");
   const [feedbackJoint, setFeedbackJoint] = useState("none");
   const [feedbackScore, setFeedbackScore] = useState("");
+  const [sessionNote, setSessionNote] = useState("");
+  const [customActivityName, setCustomActivityName] = useState("");
+  const [customBodyRegion, setCustomBodyRegion] = useState("full_body");
+  const [customPrimaryJoint, setCustomPrimaryJoint] = useState("none");
   const [pendingRecommendationId, setPendingRecommendationId] = useState(null);
   const [selectedSessionId, setSelectedSessionId] = useState(() => {
     return resolveSelectedSessionId({
@@ -362,21 +374,16 @@ export default function App() {
   const chartAxisMax = rawChartAxisMax > 0 ? rawChartAxisMax * 1.1 : 1;
   const dayTrackWidth = Math.max(72, unifiedLoadChart.seriesKeys.length * 18 + 24);
 
-  const templateById = useMemo(() => {
-    return new Map(templates.map((template) => [template.id, template]));
-  }, [templates]);
-
   const selectedSession = useMemo(() => {
     return entries.find((entry) => entry.id === resolvedSelectedSessionId) || null;
   }, [entries, resolvedSelectedSessionId]);
 
   const selectedSessionTemplate = useMemo(() => {
-    if (!selectedSession) {
-      return null;
-    }
-
-    return templateById.get(selectedSession.templateId) || null;
-  }, [selectedSession, templateById]);
+    return resolveTemplateForEntry({
+      entry: selectedSession,
+      templates
+    });
+  }, [selectedSession, templates]);
 
   const selectedSessionLoad = useMemo(() => {
     if (!selectedSession || !selectedSessionTemplate) {
@@ -779,6 +786,10 @@ export default function App() {
     setSessionPainScore(String(todaysCheckIn?.painScore ?? 4));
     setFeedbackJoint("none");
     setFeedbackScore("");
+    setSessionNote("");
+    setCustomActivityName("");
+    setCustomBodyRegion("full_body");
+    setCustomPrimaryJoint("none");
     setEntryError("");
     setPendingRecommendationId(savedRecommendation.id);
     handleViewChange("log");
@@ -832,6 +843,14 @@ export default function App() {
       return;
     }
 
+    if (
+      templateId === CUSTOM_ACTIVITY_TEMPLATE_ID &&
+      String(customActivityName || "").trim().length === 0
+    ) {
+      emitValidationError("Name the custom activity before saving.");
+      return;
+    }
+
     if (!Number.isFinite(pain) || pain < 0 || pain > 10) {
       emitValidationError("Pain score must be between 0 and 10.");
       return;
@@ -871,10 +890,19 @@ export default function App() {
       effortScore: effort,
       variant,
       completionStatus,
+      sessionNote: String(sessionNote || "").trim() || undefined,
       jointFeedback:
         feedbackJoint === "none"
           ? undefined
-          : { [feedbackJoint]: Number(feedbackScore) }
+          : { [feedbackJoint]: Number(feedbackScore) },
+      customActivity:
+        templateId === CUSTOM_ACTIVITY_TEMPLATE_ID
+          ? {
+              name: String(customActivityName || "").trim(),
+              bodyRegion: customBodyRegion,
+              primaryJoint: customPrimaryJoint === "none" ? null : customPrimaryJoint
+            }
+          : undefined
     };
     const nextEntry = savedRecommendation
       ? buildRecommendationLinkedEntry({
@@ -910,6 +938,10 @@ export default function App() {
     setSelectedSessionId(nextEntry.id);
     setEntryError("");
     setFeedbackScore("");
+    setSessionNote("");
+    setCustomActivityName("");
+    setCustomBodyRegion("full_body");
+    setCustomPrimaryJoint("none");
     setPendingRecommendationId(null);
     setCompletionStatus("completed");
     emitFeedback({
@@ -1388,7 +1420,6 @@ export default function App() {
         <>
           <View style={styles.sessionList}>
             {entries.map((entry, index) => {
-              const template = templateById.get(entry.templateId);
               const isSelected = entry.id === resolvedSelectedSessionId;
               const painText = Number.isFinite(Number(entry.painScore)) ? `${entry.painScore}/10` : "N/A";
               const adherenceText = entry.recommendationLink
@@ -1410,7 +1441,7 @@ export default function App() {
                       isSelected ? styles.sessionListTitleActive : styles.sessionListTitleInactive
                     ]}
                   >
-                    {template?.name || entry.templateId}
+                    {getEntryActivityLabel({ entry, templates })}
                   </Text>
                   <Text
                     style={[
@@ -1432,7 +1463,7 @@ export default function App() {
               <View style={styles.sessionDetailHeaderRow}>
                 <View style={styles.sessionDetailHeaderText}>
                   <Text testID="session-detail-title" style={styles.sessionDetailTitle}>
-                    {selectedSessionTemplate?.name || selectedSession.templateId}
+                    {getEntryActivityLabel({ entry: selectedSession, templates })}
                   </Text>
                   <Text style={styles.sessionDetailSubtitle}>Selected session</Text>
                 </View>
@@ -1470,9 +1501,24 @@ export default function App() {
                 </>
               ) : null}
 
+              {selectedSession.customActivity ? (
+                <>
+                  <Text style={styles.sessionDetailLabel}>Custom activity</Text>
+                  <Text style={styles.sessionDetailValue}>
+                    {selectedSession.customActivity.bodyRegion} ·{" "}
+                    {selectedSession.customActivity.primaryJoint || "no primary joint"}
+                  </Text>
+                </>
+              ) : null}
+
               <Text style={styles.sessionDetailLabel}>Joint discomfort</Text>
               <Text style={styles.sessionDetailValue}>
                 {formatJointFeedback(selectedSession.jointFeedback)}
+              </Text>
+
+              <Text style={styles.sessionDetailLabel}>Notes</Text>
+              <Text style={styles.sessionDetailValue}>
+                {selectedSession.sessionNote || "No notes recorded."}
               </Text>
 
               <Text style={styles.sessionDetailLabel}>Highest joint load</Text>
@@ -1543,7 +1589,105 @@ export default function App() {
             </Text>
           </Pressable>
         ))}
+        <Pressable
+          testID={`btn-template-${CUSTOM_ACTIVITY_TEMPLATE_ID}`}
+          onPress={() => setTemplateId(CUSTOM_ACTIVITY_TEMPLATE_ID)}
+          style={[
+            styles.pill,
+            templateId === CUSTOM_ACTIVITY_TEMPLATE_ID ? styles.pillActive : styles.pillInactive
+          ]}
+        >
+          <Text
+            style={[
+              styles.pillText,
+              templateId === CUSTOM_ACTIVITY_TEMPLATE_ID
+                ? styles.pillTextActive
+                : styles.pillTextInactive
+            ]}
+          >
+            Custom
+          </Text>
+        </Pressable>
       </View>
+
+      {templateId === CUSTOM_ACTIVITY_TEMPLATE_ID ? (
+        <>
+          <View onLayout={captureLayout("field-custom-activity-name", "load-form-card")}>
+            <Text style={styles.label}>Custom activity name</Text>
+            <TextInput
+              testID="input-custom-activity-name"
+              value={customActivityName}
+              onChangeText={setCustomActivityName}
+              onFocus={() => handleInputFocus("field-custom-activity-name")}
+              style={styles.input}
+              placeholder="Examples: pool running, band mobility"
+              placeholderTextColor="#678475"
+            />
+          </View>
+
+          <Text style={styles.label}>Primary body region</Text>
+          <View style={styles.wrapRow}>
+            {CUSTOM_ACTIVITY_BODY_REGION_OPTIONS.map((option) => (
+              <Pressable
+                key={option}
+                testID={`btn-custom-body-region-${option}`}
+                onPress={() => setCustomBodyRegion(option)}
+                style={[
+                  styles.pill,
+                  customBodyRegion === option ? styles.pillActive : styles.pillInactive
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    customBodyRegion === option ? styles.pillTextActive : styles.pillTextInactive
+                  ]}
+                >
+                  {formatOptionLabel(option)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Primary joint focus</Text>
+          <View style={styles.wrapRow}>
+            <Pressable
+              testID="btn-custom-primary-joint-none"
+              onPress={() => setCustomPrimaryJoint("none")}
+              style={[styles.pill, customPrimaryJoint === "none" ? styles.pillActive : styles.pillInactive]}
+            >
+              <Text
+                style={[
+                  styles.pillText,
+                  customPrimaryJoint === "none" ? styles.pillTextActive : styles.pillTextInactive
+                ]}
+              >
+                None
+              </Text>
+            </Pressable>
+            {JOINT_IDS.map((jointId) => (
+              <Pressable
+                key={jointId}
+                testID={`btn-custom-primary-joint-${jointId}`}
+                onPress={() => setCustomPrimaryJoint(jointId)}
+                style={[
+                  styles.pill,
+                  customPrimaryJoint === jointId ? styles.pillActive : styles.pillInactive
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    customPrimaryJoint === jointId ? styles.pillTextActive : styles.pillTextInactive
+                  ]}
+                >
+                  {formatJointLabel(jointId)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
 
       <Text style={styles.label}>Variant</Text>
       <View style={styles.row}>
@@ -1589,7 +1733,7 @@ export default function App() {
 
       <Text style={styles.label}>Completion</Text>
       <View style={styles.row}>
-        {["completed", "partial"].map((option) => (
+        {["completed", "partial", "skipped"].map((option) => (
           <Pressable
             key={option}
             testID={`btn-completion-${option}`}
@@ -1657,6 +1801,20 @@ export default function App() {
           />
         </View>
       ) : null}
+
+      <View onLayout={captureLayout("field-session-note", "load-form-card")}>
+        <Text style={styles.label}>Notes (optional)</Text>
+        <TextInput
+          testID="input-session-note"
+          value={sessionNote}
+          onChangeText={setSessionNote}
+          onFocus={() => handleInputFocus("field-session-note")}
+          style={[styles.input, styles.noteInput]}
+          multiline
+          placeholder="Mistakes, limitations, or deviations"
+          placeholderTextColor="#678475"
+        />
+      </View>
 
       {entryError ? (
         <Text testID="entry-error-text" style={styles.errorText}>

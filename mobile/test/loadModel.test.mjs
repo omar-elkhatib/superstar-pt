@@ -12,6 +12,7 @@ import {
   summarizeRollingLoad
 } from "../src/loadModel.mjs";
 import { DEFAULT_EXERCISE_TEMPLATES } from "../src/exerciseTemplates.mjs";
+import { CUSTOM_ACTIVITY_TEMPLATE_ID } from "../src/activityEntryMetadata.mjs";
 
 function templateById(id) {
   return DEFAULT_EXERCISE_TEMPLATES.find((item) => item.id === id);
@@ -166,6 +167,32 @@ test("buildDailyLoadSeries returns empty days when no valid template-backed entr
   });
 
   assert.equal(series.days.length, 0);
+});
+
+test("buildDailyLoadSeries includes custom activities through a synthetic fallback template", () => {
+  const series = buildDailyLoadSeries({
+    entries: [
+      {
+        id: "custom-1",
+        templateId: CUSTOM_ACTIVITY_TEMPLATE_ID,
+        customActivity: {
+          name: "Elliptical intervals",
+          bodyRegion: "cardio",
+          primaryJoint: "hip"
+        },
+        durationMinutes: 25,
+        effortScore: 5,
+        variant: "base",
+        performedAtIso: "2026-02-26T12:00:00.000Z"
+      }
+    ],
+    templates: DEFAULT_EXERCISE_TEMPLATES,
+    asOfIso: "2026-02-28T12:00:00.000Z"
+  });
+
+  assert.equal(series.days.length, 3);
+  assert.equal(series.days[0].totalLoad, 125);
+  assert.ok(series.days[0].byJoint.hip > 0);
 });
 
 test("buildDailyLoadSeries extends through asOf day after the latest entry", () => {
