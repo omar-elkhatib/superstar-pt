@@ -124,6 +124,11 @@ PROGRESS / LOAD
   - `Progress > Load`
 - Treat those screenshots as the design wireframes and verification artifacts.
 
+## Execution Breakdown
+
+- Parallelized implementation workstreams live under `docs/ui-overhaul/`.
+- Start with `docs/ui-overhaul/README.md` and `docs/ui-overhaul/02-sequencing-and-wave-plan.md`.
+
 ## Public Interfaces / Structural Changes
 
 - Add React Navigation tab + stack structure:
