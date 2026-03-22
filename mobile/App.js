@@ -59,6 +59,11 @@ import {
   getEntryActivityLabel,
   resolveTemplateForEntry
 } from "./src/activityEntryMetadata.mjs";
+import {
+  FOLLOW_UP_APPROPRIATENESS_OPTIONS,
+  FOLLOW_UP_FUNCTIONAL_IMPACT_OPTIONS,
+  buildFollowUpCompletionPayload
+} from "./src/followUpModel.mjs";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { LogScreen } from "./src/screens/LogScreen";
 import { HistoryScreen } from "./src/screens/HistoryScreen";
@@ -107,7 +112,7 @@ function formatJointLabel(jointId) {
 
 function formatOptionLabel(value) {
   return String(value || "")
-    .split("-")
+    .split(/[-_]/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
@@ -197,6 +202,30 @@ function formatJointFeedback(jointFeedback) {
     .join(", ");
 }
 
+function formatFollowUpTiming(scheduledForIso, isOverdue) {
+  const scheduledAt = Date.parse(scheduledForIso);
+  if (!Number.isFinite(scheduledAt)) {
+    return isOverdue ? "Overdue" : "Pending";
+  }
+
+  return `${isOverdue ? "Overdue" : "Due"} ${new Date(scheduledForIso).toLocaleString()}`;
+}
+
+function formatDelayedOutcomeImpact(value) {
+  switch (value) {
+    case "flare":
+      return "Caused a flare";
+    case "limited":
+      return "Limited function";
+    case "unchanged":
+      return "No real change";
+    case "improved":
+      return "Improved function";
+    default:
+      return formatOptionLabel(value);
+  }
+}
+
 function findHighestLoadJoint(computed) {
   if (!computed?.byJoint) {
     return null;
@@ -276,8 +305,8 @@ export default function App() {
   const [selectedFollowUpTaskId, setSelectedFollowUpTaskId] = useState(null);
   const [followUpPainResponse, setFollowUpPainResponse] = useState("0");
   const [followUpFatigueResponse, setFollowUpFatigueResponse] = useState("0");
-  const [followUpFunctionalImpact, setFollowUpFunctionalImpact] = useState("same");
-  const [followUpAppropriateness, setFollowUpAppropriateness] = useState("about-right");
+  const [followUpFunctionalImpact, setFollowUpFunctionalImpact] = useState("improved");
+  const [followUpAppropriateness, setFollowUpAppropriateness] = useState("appropriate");
   const [followUpNote, setFollowUpNote] = useState("");
   const [followUpError, setFollowUpError] = useState("");
   const [feedbackNotice, setFeedbackNotice] = useState(null);
@@ -983,8 +1012,8 @@ export default function App() {
     setSelectedFollowUpTaskId(taskId);
     setFollowUpPainResponse("0");
     setFollowUpFatigueResponse("0");
-    setFollowUpFunctionalImpact("same");
-    setFollowUpAppropriateness("about-right");
+    setFollowUpFunctionalImpact("improved");
+    setFollowUpAppropriateness("appropriate");
     setFollowUpNote("");
     setFollowUpError("");
     setActiveView("home");
@@ -995,56 +1024,50 @@ export default function App() {
   }
 
   function handleSaveFollowUp() {
-    const pain = Number(followUpPainResponse);
-    const fatigue = Number(followUpFatigueResponse);
-    const invalidMessage =
-      !selectedFollowUpItem
-        ? "Pick a pending follow-up first."
-        : !Number.isFinite(pain) || pain < 0 || pain > 10
-          ? "Follow-up pain must be between 0 and 10."
-          : !Number.isFinite(fatigue) || fatigue < 0 || fatigue > 10
-            ? "Follow-up fatigue must be between 0 and 10."
-            : !followUpFunctionalImpact
-              ? "Choose how the session affected function."
-              : !followUpAppropriateness
-                ? "Choose whether the session felt appropriate."
-                : "";
+    if (!selectedFollowUpItem) {
+      return;
+    }
 
-    if (invalidMessage) {
-      setFollowUpError(invalidMessage);
+    let payload;
+    try {
+      payload = buildFollowUpCompletionPayload({
+        painResponse: followUpPainResponse,
+        fatigueResponse: followUpFatigueResponse,
+        functionalImpact: followUpFunctionalImpact,
+        appropriateness: followUpAppropriateness,
+        note: followUpNote
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Complete all follow-up fields.";
+      setFollowUpError(message);
       emitFeedback({
         type: "session_validation_error",
-        message: invalidMessage
+        message
       });
       return;
     }
 
-    appHistoryStore.completeFollowUpTask(
+    const completed = appHistoryStore.completeFollowUpTask(
       {
         taskId: selectedFollowUpItem.taskId,
-        outcome: {
-          painResponse: pain,
-          fatigueResponse: fatigue,
-          functionalImpact: followUpFunctionalImpact,
-          appropriateness: followUpAppropriateness,
-          note: followUpNote
-        }
+        outcome: payload
       },
       { nowIso: new Date().toISOString() }
     );
 
     setEntries(appHistoryStore.getEntries());
     setFollowUpTasks(appHistoryStore.getFollowUpTasks());
+    setSelectedSessionId(completed.entry?.id || resolvedSelectedSessionId);
     setSelectedFollowUpTaskId(null);
     setFollowUpError("");
     setFollowUpPainResponse("0");
     setFollowUpFatigueResponse("0");
-    setFollowUpFunctionalImpact("same");
-    setFollowUpAppropriateness("about-right");
+    setFollowUpFunctionalImpact("improved");
+    setFollowUpAppropriateness("appropriate");
     setFollowUpNote("");
     emitFeedback({
       type: "session_added",
-      templateId: "follow-up"
+      templateId: completed.entry?.templateId || "follow-up"
     });
   }
 
@@ -1630,6 +1653,24 @@ export default function App() {
               <Text testID="session-detail-top-joint-loads" style={styles.sessionDetailValue}>
                 {selectedSessionLoadSummary}
               </Text>
+
+              {selectedSession.delayedOutcome ? (
+                <>
+                  <Text style={styles.sessionDetailLabel}>Delayed outcome</Text>
+                  <Text testID="session-detail-delayed-outcome" style={styles.sessionDetailValue}>
+                    Pain {selectedSession.delayedOutcome.painResponse}/10 · fatigue{" "}
+                    {selectedSession.delayedOutcome.fatigueResponse}/10 ·{" "}
+                    {formatDelayedOutcomeImpact(selectedSession.delayedOutcome.functionalImpact)} ·{" "}
+                    {formatOptionLabel(selectedSession.delayedOutcome.appropriateness)}
+                  </Text>
+                  <Text style={styles.sessionDetailMeta}>
+                    Saved {formatPerformedAt(selectedSession.delayedOutcome.completedAtIso)}
+                  </Text>
+                  {selectedSession.delayedOutcome.note ? (
+                    <Text style={styles.sessionDetailValue}>{selectedSession.delayedOutcome.note}</Text>
+                  ) : null}
+                </>
+              ) : null}
             </View>
           ) : null}
         </>
@@ -2103,52 +2144,60 @@ export default function App() {
             />
           </View>
 
-          <Text style={styles.label}>Functional impact</Text>
-          <View style={styles.wrapRow}>
-            {["better", "same", "worse"].map((option) => (
-              <Pressable
-                key={option}
-                testID={`btn-followup-functional-impact-${option}`}
-                onPress={() => setFollowUpFunctionalImpact(option)}
-                style={[
-                  styles.pill,
-                  followUpFunctionalImpact === option ? styles.pillActive : styles.pillInactive
-                ]}
-              >
-                <Text
+          <View onLayout={captureLayout("field-followup-impact", "follow-up-inbox-card")}>
+            <Text style={styles.label}>Functional impact</Text>
+            <View style={styles.wrapRow}>
+              {FOLLOW_UP_FUNCTIONAL_IMPACT_OPTIONS.map((option) => (
+                <Pressable
+                  key={option}
+                  testID={`btn-followup-functional-impact-${option}`}
+                  onPress={() => setFollowUpFunctionalImpact(option)}
                   style={[
-                    styles.pillText,
-                    followUpFunctionalImpact === option ? styles.pillTextActive : styles.pillTextInactive
+                    styles.pill,
+                    followUpFunctionalImpact === option ? styles.pillActive : styles.pillInactive
                   ]}
                 >
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.pillText,
+                      followUpFunctionalImpact === option
+                        ? styles.pillTextActive
+                        : styles.pillTextInactive
+                    ]}
+                  >
+                    {formatDelayedOutcomeImpact(option)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
-          <Text style={styles.label}>In hindsight, was the session appropriate?</Text>
-          <View style={styles.wrapRow}>
-            {["too-easy", "about-right", "too-much"].map((option) => (
-              <Pressable
-                key={option}
-                testID={`btn-followup-appropriateness-${option}`}
-                onPress={() => setFollowUpAppropriateness(option)}
-                style={[
-                  styles.pill,
-                  followUpAppropriateness === option ? styles.pillActive : styles.pillInactive
-                ]}
-              >
-                <Text
+          <View onLayout={captureLayout("field-followup-appropriateness", "follow-up-inbox-card")}>
+            <Text style={styles.label}>In hindsight, was the session appropriate?</Text>
+            <View style={styles.wrapRow}>
+              {FOLLOW_UP_APPROPRIATENESS_OPTIONS.map((option) => (
+                <Pressable
+                  key={option}
+                  testID={`btn-followup-appropriateness-${option}`}
+                  onPress={() => setFollowUpAppropriateness(option)}
                   style={[
-                    styles.pillText,
-                    followUpAppropriateness === option ? styles.pillTextActive : styles.pillTextInactive
+                    styles.pill,
+                    followUpAppropriateness === option ? styles.pillActive : styles.pillInactive
                   ]}
                 >
-                  {formatOptionLabel(option)}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.pillText,
+                      followUpAppropriateness === option
+                        ? styles.pillTextActive
+                        : styles.pillTextInactive
+                    ]}
+                  >
+                    {formatOptionLabel(option)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           <View onLayout={captureLayout("field-followup-note", "follow-up-inbox-card")}>
@@ -2194,6 +2243,7 @@ export default function App() {
       ) : null}
     </View>
   );
+  const followUpCard = null;
   const screenVisibility = buildScreenVisibilityMap(activeView);
 
   return (
@@ -2251,6 +2301,7 @@ export default function App() {
           dailyCheckInCard={dailyCheckInCard}
           recommendationCard={recommendationCard}
           recommendationHistoryCard={recommendationHistoryCard}
+          followUpCard={followUpCard}
           onOpenInsights={() => handleViewChange("insights")}
         />
         <LogScreen
@@ -2317,6 +2368,12 @@ const styles = StyleSheet.create({
   },
   visualizationView: { gap: 18 },
   sectionTitle: { fontSize: 18, color: "#0d3b2a", fontWeight: "700" },
+  followUpCard: {
+    borderWidth: 1,
+    borderColor: "#cfe4d9",
+    backgroundColor: "#f9fcfa"
+  },
+  followUpHeaderText: { flex: 1, paddingRight: 12 },
   dailyCheckInCard: {
     borderWidth: 1,
     borderColor: "#cfe4d9",
@@ -2423,6 +2480,43 @@ const styles = StyleSheet.create({
   dailySummaryText: { fontSize: 14, color: "#214d3b", fontWeight: "600" },
   dailySummaryMeta: { fontSize: 12, color: "#4d7665" },
   dailySummaryNote: { fontSize: 13, color: "#315d4b", lineHeight: 18 },
+  followUpSummaryPanel: {
+    backgroundColor: "#edf7ef",
+    borderRadius: 12,
+    padding: 14,
+    gap: 6
+  },
+  followUpSummaryPanelOverdue: {
+    backgroundColor: "#fff0e4"
+  },
+  followUpPromptTitle: {
+    fontSize: 16,
+    color: "#184032",
+    fontWeight: "700"
+  },
+  followUpPromptSummary: {
+    fontSize: 14,
+    color: "#2a5544",
+    lineHeight: 20
+  },
+  followUpPromptMeta: {
+    fontSize: 12,
+    color: "#557667",
+    fontWeight: "600"
+  },
+  followUpCompletePanel: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#d8e8df",
+    padding: 14,
+    gap: 4
+  },
+  followUpCompleteTitle: {
+    fontSize: 15,
+    color: "#174131",
+    fontWeight: "700"
+  },
   dailyEditorCard: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
@@ -2751,6 +2845,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#1c4535",
     lineHeight: 20
+  },
+  sessionDetailMeta: {
+    fontSize: 12,
+    color: "#4d7665",
+    lineHeight: 18
   },
   deleteSessionButton: {
     backgroundColor: "#ffe4e4",

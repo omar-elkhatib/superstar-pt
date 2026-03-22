@@ -7,6 +7,7 @@ export function HomeScreen({
   dailyCheckInCard,
   recommendationCard,
   recommendationHistoryCard,
+  followUpCard,
   onOpenInsights
 }) {
   return (
@@ -20,6 +21,7 @@ export function HomeScreen({
       {dailyCheckInCard}
       {recommendationCard}
       {recommendationHistoryCard}
+      {followUpCard}
       <Pressable
         testID="btn-view-visualization"
         onPress={onOpenInsights}
