@@ -9,9 +9,83 @@ import {
 const ENTRIES_KEY = "superstar_pt.exercise_entries.v1";
 const CHECK_INS_KEY = "superstar_pt.daily_check_ins.v1";
 const RECOMMENDATION_SNAPSHOTS_KEY = "superstar_pt.recommendation_snapshots.v1";
+const FOLLOW_UP_TASKS_KEY = "superstar_pt.follow_up_tasks.v1";
 const TOLERANCE_KEY = "superstar_pt.joint_tolerance.v1";
 const TEMPLATES_KEY = "superstar_pt.exercise_templates.v1";
 const BASELINE_PROFILE_KEY = "superstar_pt.baseline_profile.v1";
+const DEFAULT_FOLLOW_UP_WINDOW_HOURS = 24;
+
+function addHoursToIso(isoString, hours) {
+  return new Date(Date.parse(isoString) + hours * 60 * 60 * 1000).toISOString();
+}
+
+function normalizeFollowUpTask(task) {
+  return {
+    id: typeof task?.id === "string" ? task.id : "",
+    entryId: typeof task?.entryId === "string" ? task.entryId : "",
+    status: task?.status === "completed" ? "completed" : "pending",
+    windowHours: Number(task?.windowHours) || DEFAULT_FOLLOW_UP_WINDOW_HOURS,
+    scheduledForIso: typeof task?.scheduledForIso === "string" ? task.scheduledForIso : "",
+    createdAtIso: typeof task?.createdAtIso === "string" ? task.createdAtIso : "",
+    updatedAtIso: typeof task?.updatedAtIso === "string" ? task.updatedAtIso : "",
+    completedAtIso: typeof task?.completedAtIso === "string" ? task.completedAtIso : null,
+    outcome:
+      task?.outcome && typeof task.outcome === "object"
+        ? {
+            painResponse: Number(task.outcome.painResponse) || 0,
+            fatigueResponse: Number(task.outcome.fatigueResponse) || 0,
+            functionalImpact:
+              typeof task.outcome.functionalImpact === "string" ? task.outcome.functionalImpact : "",
+            appropriateness:
+              typeof task.outcome.appropriateness === "string" ? task.outcome.appropriateness : "",
+            note: typeof task.outcome.note === "string" ? task.outcome.note : ""
+          }
+        : null
+  };
+}
+
+function normalizeEntryFollowUp(entry) {
+  const pendingTaskIds = Array.isArray(entry?.followUp?.pendingTaskIds)
+    ? entry.followUp.pendingTaskIds.filter((taskId) => typeof taskId === "string" && taskId.length > 0)
+    : [];
+
+  return {
+    pendingTaskIds,
+    lastTaskId: typeof entry?.followUp?.lastTaskId === "string" ? entry.followUp.lastTaskId : null,
+    lastStatus: entry?.followUp?.lastStatus === "completed" ? "completed" : "pending",
+    lastWindowHours: Number(entry?.followUp?.lastWindowHours) || DEFAULT_FOLLOW_UP_WINDOW_HOURS,
+    nextPromptAtIso:
+      typeof entry?.followUp?.nextPromptAtIso === "string" ? entry.followUp.nextPromptAtIso : null,
+    completedAtIso:
+      typeof entry?.followUp?.completedAtIso === "string" ? entry.followUp.completedAtIso : null
+  };
+}
+
+function normalizeDelayedOutcome(outcome) {
+  if (!outcome || typeof outcome !== "object") {
+    return null;
+  }
+
+  return {
+    taskId: typeof outcome.taskId === "string" ? outcome.taskId : "",
+    completedAtIso: typeof outcome.completedAtIso === "string" ? outcome.completedAtIso : "",
+    painResponse: Number(outcome.painResponse) || 0,
+    fatigueResponse: Number(outcome.fatigueResponse) || 0,
+    functionalImpact: typeof outcome.functionalImpact === "string" ? outcome.functionalImpact : "",
+    appropriateness: typeof outcome.appropriateness === "string" ? outcome.appropriateness : "",
+    note: typeof outcome.note === "string" ? outcome.note : ""
+  };
+}
+
+function withEntryFollowUp(entry, followUpPatch) {
+  return {
+    ...entry,
+    followUp: {
+      ...normalizeEntryFollowUp(entry),
+      ...followUpPatch
+    }
+  };
+}
 
 export function createDefaultBaselineProfile() {
   return {
@@ -80,18 +154,23 @@ export function createHistoryStore(storage = createMemoryStorage()) {
   }
 
   function addEntry(entry) {
-    const entries = getEntries();
-    const saved = [...entries, entry].sort(
-      (a, b) => Date.parse(b.performedAtIso) - Date.parse(a.performedAtIso)
-    );
-    setEntries(saved);
-    return saved;
+    return saveEntry(entry).entries;
   }
 
   function deleteEntry(entryId) {
     const remaining = getEntries().filter((entry) => entry.id !== entryId);
+    const remainingFollowUpTasks = getFollowUpTasks().filter((task) => task.entryId !== entryId);
     setEntries(remaining);
+    setFollowUpTasks(remainingFollowUpTasks);
     return remaining;
+  }
+
+  function getFollowUpTasks() {
+    return parseOrFallback(storage.getItem(FOLLOW_UP_TASKS_KEY), []).map(normalizeFollowUpTask);
+  }
+
+  function setFollowUpTasks(tasks) {
+    storage.setItem(FOLLOW_UP_TASKS_KEY, JSON.stringify(tasks.map(normalizeFollowUpTask)));
   }
 
   function getCheckIns() {
@@ -230,18 +309,140 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     return normalized;
   }
 
+  function saveEntry(
+    entry,
+    {
+      nowIso = new Date().toISOString(),
+      followUpWindowHours = DEFAULT_FOLLOW_UP_WINDOW_HOURS,
+      allowDuplicatePendingFollowUp = false
+    } = {}
+  ) {
+    const existingEntries = getEntries();
+    const pendingFollowUpTask =
+      !allowDuplicatePendingFollowUp &&
+      getFollowUpTasks().find((task) => task.entryId === entry?.id && task.status === "pending");
+    const nextFollowUpTask =
+      pendingFollowUpTask ||
+      {
+        id: `follow-up-${entry?.id}-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`,
+        entryId: entry?.id || "",
+        status: "pending",
+        windowHours: Number(followUpWindowHours) || DEFAULT_FOLLOW_UP_WINDOW_HOURS,
+        scheduledForIso: addHoursToIso(
+          entry?.performedAtIso || nowIso,
+          Number(followUpWindowHours) || DEFAULT_FOLLOW_UP_WINDOW_HOURS
+        ),
+        createdAtIso: nowIso,
+        updatedAtIso: nowIso,
+        completedAtIso: null,
+        outcome: null
+      };
+    const nextEntry = withEntryFollowUp(entry, {
+      pendingTaskIds: Array.from(
+        new Set([...(entry?.followUp?.pendingTaskIds || []), nextFollowUpTask.id])
+      ),
+      lastTaskId: nextFollowUpTask.id,
+      lastStatus: nextFollowUpTask.status,
+      lastWindowHours: nextFollowUpTask.windowHours,
+      nextPromptAtIso: nextFollowUpTask.scheduledForIso,
+      completedAtIso: null
+    });
+    const savedEntries = [...existingEntries.filter((item) => item.id !== nextEntry.id), nextEntry].sort(
+      (a, b) => Date.parse(b.performedAtIso) - Date.parse(a.performedAtIso)
+    );
+
+    setEntries(savedEntries);
+
+    if (!pendingFollowUpTask || allowDuplicatePendingFollowUp) {
+      setFollowUpTasks([...getFollowUpTasks(), nextFollowUpTask]);
+    }
+
+    return {
+      entry: nextEntry,
+      entries: savedEntries,
+      followUpTask: nextFollowUpTask,
+      followUpTasks: getFollowUpTasks()
+    };
+  }
+
+  function completeFollowUpTask(
+    { taskId, outcome },
+    { nowIso = new Date().toISOString() } = {}
+  ) {
+    const tasks = getFollowUpTasks();
+    const targetTask = tasks.find((task) => task.id === taskId) || null;
+
+    if (!targetTask) {
+      return { task: null, entry: null };
+    }
+
+    const completedTask = {
+      ...targetTask,
+      status: "completed",
+      updatedAtIso: nowIso,
+      completedAtIso: nowIso,
+      outcome: normalizeDelayedOutcome({
+        ...outcome,
+        taskId,
+        completedAtIso: nowIso
+      })
+    };
+    const nextTasks = tasks.map((task) => (task.id === taskId ? completedTask : task));
+    const nextEntries = getEntries().map((entry) => {
+      if (entry.id !== completedTask.entryId) {
+        return entry;
+      }
+
+      const currentFollowUp = normalizeEntryFollowUp(entry);
+      const pendingTaskIds = currentFollowUp.pendingTaskIds.filter((pendingTaskId) => pendingTaskId !== taskId);
+      const nextPromptAtIso =
+        nextTasks
+          .filter((task) => task.entryId === completedTask.entryId && task.status === "pending")
+          .sort((a, b) => Date.parse(a.scheduledForIso) - Date.parse(b.scheduledForIso))[0]
+          ?.scheduledForIso || null;
+
+      return {
+        ...withEntryFollowUp(entry, {
+          pendingTaskIds,
+          lastTaskId: taskId,
+          lastStatus: "completed",
+          lastWindowHours: completedTask.windowHours,
+          nextPromptAtIso,
+          completedAtIso: nowIso
+        }),
+        delayedOutcome: normalizeDelayedOutcome({
+          ...completedTask.outcome,
+          taskId,
+          completedAtIso: nowIso
+        })
+      };
+    });
+
+    setFollowUpTasks(nextTasks);
+    setEntries(nextEntries);
+
+    return {
+      task: completedTask,
+      entry: nextEntries.find((entry) => entry.id === completedTask.entryId) || null
+    };
+  }
+
   return {
     getEntries,
     setEntries,
     addEntry,
+    saveEntry,
     deleteEntry,
     getCheckIns,
     setCheckIns,
     getRecommendationSnapshots,
     setRecommendationSnapshots,
+    getFollowUpTasks,
+    setFollowUpTasks,
     saveDailyCheckIn,
     saveRecommendationSnapshot,
     saveRecommendationAdherence,
+    completeFollowUpTask,
     getToleranceState,
     setToleranceState,
     getTemplates,

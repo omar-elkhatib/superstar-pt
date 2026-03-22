@@ -339,3 +339,153 @@ test("history store supports skipped onboarding without blocking app use", () =>
     sensitiveAreas: []
   });
 });
+
+test("history store schedules a default 24-hour follow-up when an entry is saved", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  const result = store.saveEntry(
+    {
+      id: "session-follow-up-24h",
+      templateId: "walking",
+      performedAtIso: "2026-03-20T10:00:00.000Z",
+      durationMinutes: 30,
+      effortScore: 4,
+      variant: "base"
+    },
+    { nowIso: "2026-03-20T10:00:00.000Z" }
+  );
+
+  assert.equal(result.entry.followUp.lastStatus, "pending");
+  assert.equal(result.entry.followUp.lastWindowHours, 24);
+  assert.equal(result.entry.followUp.nextPromptAtIso, "2026-03-21T10:00:00.000Z");
+  assert.equal(result.followUpTask.status, "pending");
+  assert.equal(result.followUpTask.windowHours, 24);
+  assert.equal(result.followUpTask.scheduledForIso, "2026-03-21T10:00:00.000Z");
+
+  const reloadedStore = createHistoryStore(storage);
+  const [savedTask] = reloadedStore.getFollowUpTasks();
+  const [savedEntry] = reloadedStore.getEntries();
+
+  assert.equal(savedTask.entryId, "session-follow-up-24h");
+  assert.equal(savedEntry.followUp.lastTaskId, savedTask.id);
+  assert.deepEqual(savedEntry.followUp.pendingTaskIds, [savedTask.id]);
+});
+
+test("history store supports 48-hour follow-up scheduling", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  const result = store.saveEntry(
+    {
+      id: "session-follow-up-48h",
+      templateId: "cycling",
+      performedAtIso: "2026-03-20T10:00:00.000Z",
+      durationMinutes: 45,
+      effortScore: 5,
+      variant: "seated"
+    },
+    {
+      nowIso: "2026-03-20T10:00:00.000Z",
+      followUpWindowHours: 48
+    }
+  );
+
+  assert.equal(result.followUpTask.windowHours, 48);
+  assert.equal(result.followUpTask.scheduledForIso, "2026-03-22T10:00:00.000Z");
+  assert.equal(result.entry.followUp.nextPromptAtIso, "2026-03-22T10:00:00.000Z");
+});
+
+test("history store deduplicates pending follow-up tasks for the same session by default", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+  const entry = {
+    id: "session-dedupe",
+    templateId: "rowing",
+    performedAtIso: "2026-03-20T10:00:00.000Z",
+    durationMinutes: 25,
+    effortScore: 6,
+    variant: "supported"
+  };
+
+  const first = store.saveEntry(entry, { nowIso: "2026-03-20T10:00:00.000Z" });
+  const second = store.saveEntry(entry, { nowIso: "2026-03-20T10:05:00.000Z" });
+  const third = store.saveEntry(entry, {
+    nowIso: "2026-03-20T10:10:00.000Z",
+    allowDuplicatePendingFollowUp: true
+  });
+
+  assert.equal(store.getFollowUpTasks().length, 2);
+  assert.equal(second.followUpTask.id, first.followUpTask.id);
+  assert.notEqual(third.followUpTask.id, first.followUpTask.id);
+});
+
+test("history store writes delayed follow-up outcomes back to the related session", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  const saved = store.saveEntry(
+    {
+      id: "session-complete-follow-up",
+      templateId: "walking",
+      performedAtIso: "2026-03-20T10:00:00.000Z",
+      durationMinutes: 20,
+      effortScore: 3,
+      variant: "base"
+    },
+    { nowIso: "2026-03-20T10:00:00.000Z" }
+  );
+
+  const completed = store.completeFollowUpTask(
+    {
+      taskId: saved.followUpTask.id,
+      outcome: {
+        painResponse: 2,
+        fatigueResponse: 3,
+        functionalImpact: "improved",
+        appropriateness: "appropriate",
+        note: "Symptoms settled by the next day."
+      }
+    },
+    { nowIso: "2026-03-21T11:15:00.000Z" }
+  );
+
+  assert.equal(completed.task.status, "completed");
+  assert.equal(completed.task.completedAtIso, "2026-03-21T11:15:00.000Z");
+  assert.equal(completed.task.outcome.functionalImpact, "improved");
+  assert.equal(completed.entry.followUp.lastStatus, "completed");
+  assert.equal(completed.entry.followUp.nextPromptAtIso, null);
+  assert.equal(completed.entry.delayedOutcome.taskId, saved.followUpTask.id);
+  assert.equal(completed.entry.delayedOutcome.note, "Symptoms settled by the next day.");
+
+  const reloadedStore = createHistoryStore(storage);
+  const [savedTask] = reloadedStore.getFollowUpTasks();
+  const [savedEntry] = reloadedStore.getEntries();
+
+  assert.equal(savedTask.status, "completed");
+  assert.equal(savedEntry.delayedOutcome.appropriateness, "appropriate");
+  assert.deepEqual(savedEntry.followUp.pendingTaskIds, []);
+});
+
+test("history store removes follow-up tasks when the related session is deleted", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  store.saveEntry(
+    {
+      id: "session-delete-follow-up",
+      templateId: "walking",
+      performedAtIso: "2026-03-20T10:00:00.000Z",
+      durationMinutes: 30,
+      effortScore: 4,
+      variant: "base"
+    },
+    { nowIso: "2026-03-20T10:00:00.000Z" }
+  );
+
+  store.deleteEntry("session-delete-follow-up");
+
+  const reloadedStore = createHistoryStore(storage);
+  assert.deepEqual(reloadedStore.getEntries(), []);
+  assert.deepEqual(reloadedStore.getFollowUpTasks(), []);
+});
