@@ -6,7 +6,20 @@
 
 ## Goal
 
-Verify the integrated overhaul, catch regressions, and produce the screenshot artifacts required for UI work.
+Verify the integrated overhaul after workstream `00` finishes the remaining live wiring, then produce the screenshot artifacts required for UI work.
+
+## Current Status
+
+Already true:
+
+- logic and structural mobile tests already cover shell contracts, theme tokens, and the `Today`/`Log`/`Progress` screen models
+- `npm test` and `npm run mobile:test` pass as of `2026-03-22`
+
+Not yet sufficient:
+
+- the overhaul still needs a final integrated pass before screenshot evidence is trustworthy
+- existing screenshot artifacts under `mobile/.derived-data/` do not cleanly prove the required `Today`/`Log`/`Progress` acceptance states for the overhaul
+- the current Linux Gas Town VM cannot run iOS simulator or Maestro screenshot verification, so this workstream stays pending locally
 
 ## Scope
 
@@ -54,6 +67,10 @@ Verify the integrated overhaul, catch regressions, and produce the screenshot ar
   - `Log` recommended-prefill
   - `Progress > Timeline`
   - `Progress > Load`
+
+Execution note:
+
+- on this Linux VM, limit the local outcome to logic-level verification and documentation of the simulator limitation
 
 ## Handoff Notes
 

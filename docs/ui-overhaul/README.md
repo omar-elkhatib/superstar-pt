@@ -17,6 +17,33 @@ The redesign must:
 - preserve the existing recommendation, persistence, load, and follow-up logic
 - produce simulator screenshots for the new primary screens before completion
 
+## Status Snapshot
+
+Verified against the repo on `2026-03-22`.
+
+Completed in repo:
+
+- bottom-tab shell, route contracts, and safe-area root bootstrap exist
+- shared theme tokens and reusable UI primitives exist
+- `Today`, `Log`, and `Progress` screen implementations exist in dedicated feature folders
+- adapter/view-model coverage exists for `Today`, `Log`, `Progress`, and shell contracts
+- `npm test` and `npm run mobile:test` currently pass
+
+Still open:
+
+- finish live integration for `Today` so it reads real store data instead of falling back to default empty-state adapter output
+- connect `Today` CTAs to the real check-in, onboarding, follow-up, and recommendation flows
+- make `Log` consume the navigation params already emitted by `Today` for recommended-session handoff
+- reconnect banner/haptic feedback state to the root host in `mobile/App.js`
+- retire remaining legacy shell files after parity is confirmed
+- rerun simulator/Maestro verification for the five overhaul screenshots after the integrated shell exists
+
+Current verdict:
+
+- workstreams `01` through `06` are effectively landed
+- workstream `00` is partially complete because shell registration exists but the cross-screen wiring is not finished
+- workstream `07` is not complete yet because the final screenshot-based verification must happen after integration
+
 ## Recommended Team Shape
 
 - `AI-0`: Integrator / shell owner
@@ -49,13 +76,10 @@ The redesign must:
 - [06-progress-screen.md](/Users/omarelkhatib/Sandbox/superstar-pt/docs/ui-overhaul/workstreams/06-progress-screen.md): `Progress` UI, timeline, load tab, session detail
 - [07-verification-and-polish.md](/Users/omarelkhatib/Sandbox/superstar-pt/docs/ui-overhaul/workstreams/07-verification-and-polish.md): cross-cutting validation, screenshots, regressions, safe area
 
-## Suggested Merge Order
+## Remaining Finish Order
 
-1. `AI-0` lands shell skeleton and folder structure.
-2. `AI-1`, `AI-2`, and `AI-5` land in parallel.
-3. `AI-3`, `AI-4`, and `AI-6` land on top of those foundations.
-4. `AI-0` performs final integration and removes the legacy shell.
-5. `AI-7` finishes regression tests, simulator screenshots, and polish fixes.
+1. `AI-0` completes the remaining integration wiring and legacy cleanup.
+2. `AI-7` reruns regression checks and captures the required overhaul screenshots from the integrated build.
 
 ## Definition Of Done
 
@@ -64,6 +88,9 @@ The redesign must:
 - `Progress` owns history and analytics; `Load` never repeats recommendation cards.
 - Toast/banner renders inside safe area.
 - Root and mobile tests pass.
+- Cross-screen handoffs work end to end:
+  - `Today` recommendation CTA opens `Log` in recommended mode with prefilled draft data
+  - `Today` check-in, onboarding, and follow-up actions no longer depend on route-injected placeholder handlers
 - Simulator screenshots exist for:
   - `Today` empty state
   - `Today` ready state
