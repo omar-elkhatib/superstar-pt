@@ -47,6 +47,11 @@ import {
   buildScreenVisibilityMap,
   DEFAULT_APP_SCREEN
 } from "./src/appShellModel.mjs";
+import {
+  buildRecommendationLinkedEntry,
+  buildRecommendationLogDraft,
+  resolveEntryRecommendation
+} from "./src/recommendationLogging.mjs";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { LogScreen } from "./src/screens/LogScreen";
 import { HistoryScreen } from "./src/screens/HistoryScreen";
@@ -106,6 +111,30 @@ function formatDayLabel(dayKey) {
     return dayKey;
   }
   return `${month}/${day}`;
+}
+
+function formatCompletionStatus(status) {
+  switch (status) {
+    case "partial":
+      return "Partially completed";
+    case "completed":
+    default:
+      return "Completed";
+  }
+}
+
+function formatAdherenceStatus(status) {
+  switch (status) {
+    case "followed":
+      return "Followed";
+    case "modified":
+      return "Modified";
+    case "skipped":
+      return "Skipped";
+    case "pending":
+    default:
+      return "Pending";
+  }
 }
 
 function shouldRenderDayTick(index, totalDays) {
@@ -218,8 +247,10 @@ export default function App() {
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [effortScore, setEffortScore] = useState("4");
   const [variant, setVariant] = useState("base");
+  const [completionStatus, setCompletionStatus] = useState("completed");
   const [feedbackJoint, setFeedbackJoint] = useState("none");
   const [feedbackScore, setFeedbackScore] = useState("");
+  const [pendingRecommendationId, setPendingRecommendationId] = useState(null);
   const [selectedSessionId, setSelectedSessionId] = useState(() => {
     return resolveSelectedSessionId({
       entries,
@@ -362,6 +393,10 @@ export default function App() {
   const selectedSessionLoadSummary = useMemo(() => {
     return formatTopJointLoads(selectedSessionLoad);
   }, [selectedSessionLoad]);
+  const todaysRecommendationSnapshot = useMemo(() => {
+    const todayKey = currentNowIso.slice(0, 10);
+    return recommendationSnapshots.find((snapshot) => snapshot.dayKey === todayKey) || null;
+  }, [currentNowIso, recommendationSnapshots]);
 
   function captureLayout(layoutKey, parentKey = null) {
     return (event) => {
@@ -549,6 +584,16 @@ export default function App() {
     });
   }
 
+  function persistCurrentRecommendation(nowIso = new Date().toISOString()) {
+    if (!dailyRecommendation) {
+      return null;
+    }
+
+    const savedSnapshot = appHistoryStore.saveRecommendationSnapshot(dailyRecommendation, { nowIso });
+    setRecommendationSnapshots(appHistoryStore.getRecommendationSnapshots());
+    return savedSnapshot;
+  }
+
   function openCheckInEditor() {
     if (todaysCheckIn) {
       setCheckInPainScore(String(todaysCheckIn.painScore));
@@ -708,6 +753,68 @@ export default function App() {
     });
   }
 
+  function handleStartRecommendedLog() {
+    const nowIso = new Date().toISOString();
+    const savedRecommendation = persistCurrentRecommendation(nowIso);
+    if (!savedRecommendation) {
+      const message = "Save today's check-in before logging a recommended session.";
+      setEntryError(message);
+      emitFeedback({
+        type: "session_validation_error",
+        message
+      });
+      return;
+    }
+
+    const draft = buildRecommendationLogDraft({
+      recommendation: savedRecommendation,
+      templates
+    });
+
+    setTemplateId(draft.templateId);
+    setDurationMinutes(String(draft.durationMinutes));
+    setEffortScore(String(draft.effortScore));
+    setVariant(draft.variant);
+    setCompletionStatus(draft.completionStatus);
+    setSessionPainScore(String(todaysCheckIn?.painScore ?? 4));
+    setFeedbackJoint("none");
+    setFeedbackScore("");
+    setEntryError("");
+    setPendingRecommendationId(savedRecommendation.id);
+    handleViewChange("log");
+
+    requestAnimationFrame(() => {
+      scrollToLayout("load-form-card");
+    });
+  }
+
+  function handleSkipRecommendation() {
+    const nowIso = new Date().toISOString();
+    const savedRecommendation = persistCurrentRecommendation(nowIso);
+    if (!savedRecommendation) {
+      emitFeedback({
+        type: "session_validation_error",
+        message: "Save today's check-in before skipping today's recommendation."
+      });
+      return;
+    }
+
+    appHistoryStore.saveRecommendationAdherence(
+      {
+        recommendationId: savedRecommendation.id,
+        adherenceStatus: "skipped"
+      },
+      { nowIso }
+    );
+
+    setRecommendationSnapshots(appHistoryStore.getRecommendationSnapshots());
+    setPendingRecommendationId(null);
+    emitFeedback({
+      type: "session_added",
+      templateId: "recommendation-skip"
+    });
+  }
+
   function handleAddEntry() {
     const pain = Number(sessionPainScore);
     const duration = Number(durationMinutes);
@@ -749,7 +856,13 @@ export default function App() {
     }
 
     const nowIso = new Date().toISOString();
-    const nextEntry = {
+    const savedRecommendation =
+      resolveEntryRecommendation({
+        explicitRecommendationId: pendingRecommendationId,
+        nowIso,
+        recommendationSnapshots: appHistoryStore.getRecommendationSnapshots()
+      }) || null;
+    const baseEntry = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       templateId,
       performedAtIso: nowIso,
@@ -757,13 +870,32 @@ export default function App() {
       durationMinutes: duration,
       effortScore: effort,
       variant,
+      completionStatus,
       jointFeedback:
         feedbackJoint === "none"
           ? undefined
           : { [feedbackJoint]: Number(feedbackScore) }
     };
+    const nextEntry = savedRecommendation
+      ? buildRecommendationLinkedEntry({
+          entry: baseEntry,
+          recommendation: savedRecommendation,
+          templates,
+          nowIso
+        })
+      : baseEntry;
 
     const updatedEntries = appHistoryStore.addEntry(nextEntry);
+    if (nextEntry.recommendationLink) {
+      appHistoryStore.saveRecommendationAdherence(
+        {
+          recommendationId: nextEntry.recommendationLink.recommendationId,
+          entryId: nextEntry.id,
+          adherenceStatus: nextEntry.recommendationLink.adherenceStatus
+        },
+        { nowIso }
+      );
+    }
     const updatedTolerance = updateToleranceFromFeedback({
       toleranceState,
       entries: updatedEntries,
@@ -774,9 +906,12 @@ export default function App() {
 
     setEntries(updatedEntries);
     setToleranceState(updatedTolerance);
+    setRecommendationSnapshots(appHistoryStore.getRecommendationSnapshots());
     setSelectedSessionId(nextEntry.id);
     setEntryError("");
     setFeedbackScore("");
+    setPendingRecommendationId(null);
+    setCompletionStatus("completed");
     emitFeedback({
       type: "session_added",
       templateId
@@ -1256,6 +1391,9 @@ export default function App() {
               const template = templateById.get(entry.templateId);
               const isSelected = entry.id === resolvedSelectedSessionId;
               const painText = Number.isFinite(Number(entry.painScore)) ? `${entry.painScore}/10` : "N/A";
+              const adherenceText = entry.recommendationLink
+                ? ` · rec ${formatAdherenceStatus(entry.recommendationLink.adherenceStatus)}`
+                : "";
               return (
                 <Pressable
                   key={entry.id}
@@ -1282,6 +1420,7 @@ export default function App() {
                   >
                     {formatPerformedAt(entry.performedAtIso)} · {entry.durationMinutes} min · effort{" "}
                     {entry.effortScore} · pain {painText}
+                    {adherenceText}
                   </Text>
                 </Pressable>
               );
@@ -1317,8 +1456,19 @@ export default function App() {
                 {Number.isFinite(Number(selectedSession.painScore))
                   ? `${selectedSession.painScore}/10`
                   : "N/A"}{" "}
-                · {selectedSession.variant}
+                · {selectedSession.variant} ·{" "}
+                {formatCompletionStatus(selectedSession.completionStatus)}
               </Text>
+
+              {selectedSession.recommendationLink ? (
+                <>
+                  <Text style={styles.sessionDetailLabel}>Recommendation link</Text>
+                  <Text testID="session-detail-recommendation-link" style={styles.sessionDetailValue}>
+                    {formatDayLabel(selectedSession.recommendationLink.dayKey)} ·{" "}
+                    {formatAdherenceStatus(selectedSession.recommendationLink.adherenceStatus)}
+                  </Text>
+                </>
+              ) : null}
 
               <Text style={styles.sessionDetailLabel}>Joint discomfort</Text>
               <Text style={styles.sessionDetailValue}>
@@ -1351,6 +1501,16 @@ export default function App() {
           <Text style={styles.quickAddButtonText}>Add session</Text>
         </Pressable>
       </View>
+
+      {pendingRecommendationId ? (
+        <View testID="recommended-log-prefill-banner" style={styles.recommendedLogBanner}>
+          <Text style={styles.recommendedLogBannerTitle}>Prefilled from today&apos;s recommendation</Text>
+          <Text style={styles.recommendedLogBannerText}>
+            Save this as-is to record a followed plan, or change the fields below and the app will
+            mark it as modified.
+          </Text>
+        </View>
+      ) : null}
 
       <View onLayout={captureLayout("field-session-pain", "load-form-card")}>
         <Text style={styles.label}>Pain (0-10)</Text>
@@ -1425,6 +1585,27 @@ export default function App() {
           keyboardType="number-pad"
           style={styles.input}
         />
+      </View>
+
+      <Text style={styles.label}>Completion</Text>
+      <View style={styles.row}>
+        {["completed", "partial"].map((option) => (
+          <Pressable
+            key={option}
+            testID={`btn-completion-${option}`}
+            onPress={() => setCompletionStatus(option)}
+            style={[styles.pill, completionStatus === option ? styles.pillActive : styles.pillInactive]}
+          >
+            <Text
+              style={[
+                styles.pillText,
+                completionStatus === option ? styles.pillTextActive : styles.pillTextInactive
+              ]}
+            >
+              {formatCompletionStatus(option)}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       <Text style={styles.label}>Optional joint discomfort feedback</Text>
@@ -1512,6 +1693,9 @@ export default function App() {
       <Text testID="result-summary-text" style={styles.resultText}>
         {dailyRecommendation?.summaryText || "Save today's check-in to tailor today's guidance."}
       </Text>
+      <Text testID="recommendation-adherence-status" style={styles.resultText}>
+        Status: {formatAdherenceStatus(todaysRecommendationSnapshot?.adherenceStatus || "pending")}
+      </Text>
       {dailyRecommendation?.isLowHistoryFallback ? (
         <Text testID="recommendation-fallback-note" style={styles.overrideNote}>
           Conservative fallback while recent history builds.
@@ -1522,6 +1706,22 @@ export default function App() {
           Joint-load override applied due to elevated risk.
         </Text>
       ) : null}
+      <View style={styles.recommendationActionRow}>
+        <Pressable
+          testID="btn-log-recommended-session"
+          onPress={handleStartRecommendedLog}
+          style={styles.recommendationActionButton}
+        >
+          <Text style={styles.recommendationActionButtonText}>Log recommended session</Text>
+        </Pressable>
+        <Pressable
+          testID="btn-skip-recommendation"
+          onPress={handleSkipRecommendation}
+          style={styles.recommendationSecondaryButton}
+        >
+          <Text style={styles.recommendationSecondaryButtonText}>Skip today&apos;s plan</Text>
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -1538,6 +1738,9 @@ export default function App() {
           </Text>
           <Text style={styles.historyText}>
             {snapshot.action} · x{snapshot.intensityMultiplier} · {snapshot.summaryText}
+          </Text>
+          <Text style={styles.historyMetaText}>
+            {formatAdherenceStatus(snapshot.adherenceStatus)}
           </Text>
         </View>
       ))}
@@ -1740,6 +1943,27 @@ const styles = StyleSheet.create({
   resultItem: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
   resultText: { color: "#eafcf3", fontSize: 14, lineHeight: 20 },
   overrideNote: { color: "#ffe3a3", fontSize: 13, fontWeight: "700" },
+  recommendationActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 6
+  },
+  recommendationActionButton: {
+    backgroundColor: "#d2ffe7",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  recommendationActionButtonText: { color: "#0d3b2a", fontWeight: "700", fontSize: 12 },
+  recommendationSecondaryButton: {
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#9fd8b6"
+  },
+  recommendationSecondaryButtonText: { color: "#d2ffe7", fontWeight: "700", fontSize: 12 },
   errorText: { color: "#962e2e", fontSize: 13, fontWeight: "600" },
   quickAddHeaderRow: {
     flexDirection: "row",
@@ -1758,6 +1982,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10
   },
+  recommendedLogBanner: {
+    backgroundColor: "#edf7ef",
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#d9e9df"
+  },
+  recommendedLogBannerTitle: { color: "#184032", fontSize: 14, fontWeight: "700" },
+  recommendedLogBannerText: { color: "#365f4e", fontSize: 13, lineHeight: 18 },
   secondaryActionButton: {
     backgroundColor: "#deebe3",
     borderRadius: 999,
@@ -2005,5 +2239,6 @@ const styles = StyleSheet.create({
     gap: 2
   },
   historyTitle: { fontSize: 15, fontWeight: "700", color: "#173b2e" },
-  historyText: { fontSize: 13, color: "#2c5b48" }
+  historyText: { fontSize: 13, color: "#2c5b48" },
+  historyMetaText: { fontSize: 12, color: "#4d7665", fontWeight: "700" }
 });

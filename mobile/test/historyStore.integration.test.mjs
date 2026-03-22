@@ -181,6 +181,88 @@ test("history store persists recommendation snapshots and replaces the same day'
   assert.equal(snapshots[0].summaryText, "Switch to low-load recovery work today.");
   assert.equal(snapshots[0].updatedAtIso, "2026-03-20T12:05:00.000Z");
   assert.equal(snapshots[0].isLowHistoryFallback, false);
+  assert.equal(snapshots[0].adherenceStatus, "pending");
+  assert.deepEqual(snapshots[0].linkedEntryIds, []);
+});
+
+test("history store persists recommendation adherence updates linked to a saved entry", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  const snapshot = store.saveRecommendationSnapshot(
+    {
+      dayKey: "2026-03-20",
+      action: "hold",
+      activityType: "Base training",
+      intensityMultiplier: 1,
+      volumeGuidance: "Keep the usual volume.",
+      summaryText: "Stay steady today."
+    },
+    { nowIso: "2026-03-20T08:15:00.000Z" }
+  );
+
+  store.addEntry({
+    id: "entry-1",
+    templateId: "walking",
+    performedAtIso: "2026-03-20T12:30:00.000Z",
+    durationMinutes: 20,
+    effortScore: 4,
+    variant: "base",
+    recommendationLink: {
+      recommendationId: snapshot.id,
+      dayKey: snapshot.dayKey,
+      adherenceStatus: "followed",
+      linkedAtIso: "2026-03-20T12:30:00.000Z"
+    }
+  });
+
+  const updatedSnapshot = store.saveRecommendationAdherence(
+    {
+      recommendationId: snapshot.id,
+      entryId: "entry-1",
+      adherenceStatus: "followed"
+    },
+    { nowIso: "2026-03-20T12:30:00.000Z" }
+  );
+
+  const reloadedStore = createHistoryStore(storage);
+  const [reloadedSnapshot] = reloadedStore.getRecommendationSnapshots();
+
+  assert.equal(updatedSnapshot.adherenceStatus, "followed");
+  assert.equal(updatedSnapshot.lastLinkedEntryId, "entry-1");
+  assert.deepEqual(updatedSnapshot.linkedEntryIds, ["entry-1"]);
+  assert.equal(reloadedSnapshot.adherenceStatus, "followed");
+  assert.equal(reloadedSnapshot.lastLinkedEntryId, "entry-1");
+  assert.deepEqual(reloadedSnapshot.linkedEntryIds, ["entry-1"]);
+});
+
+test("history store can mark a recommendation as skipped without a linked entry", () => {
+  const storage = createMemoryStorage();
+  const store = createHistoryStore(storage);
+
+  const snapshot = store.saveRecommendationSnapshot(
+    {
+      dayKey: "2026-03-20",
+      action: "hold",
+      activityType: "Recovery / technique",
+      intensityMultiplier: 0.85,
+      volumeGuidance: "Keep it short today.",
+      summaryText: "Stay light."
+    },
+    { nowIso: "2026-03-20T08:15:00.000Z" }
+  );
+
+  const skippedSnapshot = store.saveRecommendationAdherence(
+    {
+      recommendationId: snapshot.id,
+      adherenceStatus: "skipped"
+    },
+    { nowIso: "2026-03-20T09:05:00.000Z" }
+  );
+
+  assert.equal(skippedSnapshot.adherenceStatus, "skipped");
+  assert.equal(skippedSnapshot.skippedAtIso, "2026-03-20T09:05:00.000Z");
+  assert.deepEqual(skippedSnapshot.linkedEntryIds, []);
 });
 
 test("history store persists completed onboarding baseline across reloads", () => {

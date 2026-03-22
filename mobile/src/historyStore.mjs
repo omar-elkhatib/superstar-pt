@@ -1,6 +1,10 @@
 import { DEFAULT_EXERCISE_TEMPLATES } from "./exerciseTemplates.mjs";
 import { saveDailyCheckInRecord } from "./checkInModel.mjs";
 import { createDefaultToleranceState } from "./loadModel.mjs";
+import {
+  buildRecommendationLogDraft,
+  updateRecommendationSnapshotAdherence
+} from "./recommendationLogging.mjs";
 
 const ENTRIES_KEY = "superstar_pt.exercise_entries.v1";
 const CHECK_INS_KEY = "superstar_pt.daily_check_ins.v1";
@@ -121,6 +125,10 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     const existingSnapshots = getRecommendationSnapshots();
     const existing =
       existingSnapshots.find((item) => item.dayKey === snapshot?.dayKey) || null;
+    const recommendationDraft = buildRecommendationLogDraft({
+      recommendation: snapshot,
+      templates: getTemplates()
+    });
     const nextSnapshot = {
       id: existing?.id || snapshot?.id || `recommendation-${snapshot?.dayKey || "unknown"}`,
       dayKey: snapshot?.dayKey || "",
@@ -137,7 +145,27 @@ export function createHistoryStore(storage = createMemoryStorage()) {
       recentSessionCount: Number(snapshot?.recentSessionCount || 0),
       isLowHistoryFallback: Boolean(snapshot?.isLowHistoryFallback),
       overrideApplied: Boolean(snapshot?.overrideApplied),
-      overrideReason: snapshot?.overrideReason || null
+      overrideReason: snapshot?.overrideReason || null,
+      recommendedTemplateId:
+        snapshot?.recommendedTemplateId || existing?.recommendedTemplateId || recommendationDraft.templateId,
+      recommendedDurationMinutes:
+        Number(snapshot?.recommendedDurationMinutes) ||
+        Number(existing?.recommendedDurationMinutes) ||
+        recommendationDraft.durationMinutes,
+      recommendedEffortScore:
+        Number(snapshot?.recommendedEffortScore) ||
+        Number(existing?.recommendedEffortScore) ||
+        recommendationDraft.effortScore,
+      recommendedVariant:
+        snapshot?.recommendedVariant || existing?.recommendedVariant || recommendationDraft.variant,
+      adherenceStatus: snapshot?.adherenceStatus || existing?.adherenceStatus || "pending",
+      linkedEntryIds: Array.isArray(snapshot?.linkedEntryIds)
+        ? snapshot.linkedEntryIds
+        : Array.isArray(existing?.linkedEntryIds)
+          ? existing.linkedEntryIds
+          : [],
+      lastLinkedEntryId: snapshot?.lastLinkedEntryId || existing?.lastLinkedEntryId || null,
+      skippedAtIso: snapshot?.skippedAtIso || existing?.skippedAtIso || null
     };
 
     const remaining = existingSnapshots.filter((item) => item.dayKey !== nextSnapshot.dayKey);
@@ -147,6 +175,30 @@ export function createHistoryStore(storage = createMemoryStorage()) {
 
     setRecommendationSnapshots(saved);
     return nextSnapshot;
+  }
+
+  function saveRecommendationAdherence(
+    { recommendationId, adherenceStatus, entryId = null },
+    { nowIso = new Date().toISOString() } = {}
+  ) {
+    const snapshots = getRecommendationSnapshots();
+    const nextSnapshots = snapshots.map((snapshot) => {
+      if (snapshot.id !== recommendationId) {
+        return snapshot;
+      }
+
+      return updateRecommendationSnapshotAdherence({
+        snapshot,
+        adherenceStatus,
+        entryId,
+        nowIso
+      });
+    });
+    const updatedSnapshot =
+      nextSnapshots.find((snapshot) => snapshot.id === recommendationId) || null;
+
+    setRecommendationSnapshots(nextSnapshots);
+    return updatedSnapshot;
   }
 
   function getToleranceState() {
@@ -189,6 +241,7 @@ export function createHistoryStore(storage = createMemoryStorage()) {
     setRecommendationSnapshots,
     saveDailyCheckIn,
     saveRecommendationSnapshot,
+    saveRecommendationAdherence,
     getToleranceState,
     setToleranceState,
     getTemplates,
