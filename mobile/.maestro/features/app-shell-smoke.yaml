@@ -1,10 +1,15 @@
 appId: com.omarelkhatib.superstarpt
 ---
 - runFlow: ../fixtures/session-start.yaml
+- runFlow: ../fixtures/skip-onboarding.yaml
 - assertVisible:
     id: app-shell-nav
 - assertVisible:
     id: screen-home
+- scrollUntilVisible:
+    element:
+      id: card-daily-checkin
+    direction: DOWN
 - assertVisible:
     id: card-daily-checkin
 - takeScreenshot: app_shell_home

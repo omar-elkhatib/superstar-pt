@@ -1,6 +1,7 @@
 appId: com.omarelkhatib.superstarpt
 ---
 - runFlow: fixtures/session-start.yaml
+- runFlow: fixtures/skip-onboarding.yaml
 - runFlow: fixtures/open-history-screen.yaml
 - assertVisible:
     id: card-session-browser
@@ -33,6 +34,10 @@ appId: com.omarelkhatib.superstarpt
     id: btn-view-main
 - assertVisible:
     id: screen-home
+- scrollUntilVisible:
+    element:
+      id: card-daily-checkin
+    direction: DOWN
 - assertVisible:
     id: card-daily-checkin
 - takeScreenshot: back_to_main_layout

@@ -1,6 +1,11 @@
 appId: com.omarelkhatib.superstarpt
 ---
 - runFlow: ../fixtures/session-start.yaml
+- runFlow: ../fixtures/skip-onboarding.yaml
+- scrollUntilVisible:
+    element:
+      id: card-daily-checkin
+    direction: DOWN
 - assertVisible:
     id: card-daily-checkin
 - assertVisible:

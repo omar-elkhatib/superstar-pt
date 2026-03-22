@@ -1,0 +1,8 @@
+appId: com.omarelkhatib.superstarpt
+---
+- assertVisible:
+    id: card-onboarding-baseline
+- tapOn:
+    id: btn-onboarding-skip
+- assertNotVisible:
+    id: card-onboarding-baseline
