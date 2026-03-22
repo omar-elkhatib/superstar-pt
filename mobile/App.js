@@ -19,6 +19,7 @@ import {
   selectDailyHomeState
 } from "./src/checkInModel.mjs";
 import { resolveFeedbackEvent } from "./src/feedbackPolicy.mjs";
+import { buildFollowUpInboxState } from "./src/followUpInbox.mjs";
 import { triggerHaptic } from "./src/hapticsClient.mjs";
 import { appHistoryStore } from "./src/historyStore.mjs";
 import {
@@ -246,6 +247,7 @@ export default function App() {
   const [checkInError, setCheckInError] = useState("");
 
   const [entries, setEntries] = useState(() => appHistoryStore.getEntries());
+  const [followUpTasks, setFollowUpTasks] = useState(() => appHistoryStore.getFollowUpTasks());
   const [templates] = useState(() => appHistoryStore.getTemplates());
   const [toleranceState, setToleranceState] = useState(() => {
     return appHistoryStore.getToleranceState() || createDefaultToleranceState();
@@ -271,6 +273,13 @@ export default function App() {
   });
   const [showAllJointSeries, setShowAllJointSeries] = useState(false);
   const [entryError, setEntryError] = useState("");
+  const [selectedFollowUpTaskId, setSelectedFollowUpTaskId] = useState(null);
+  const [followUpPainResponse, setFollowUpPainResponse] = useState("0");
+  const [followUpFatigueResponse, setFollowUpFatigueResponse] = useState("0");
+  const [followUpFunctionalImpact, setFollowUpFunctionalImpact] = useState("same");
+  const [followUpAppropriateness, setFollowUpAppropriateness] = useState("about-right");
+  const [followUpNote, setFollowUpNote] = useState("");
+  const [followUpError, setFollowUpError] = useState("");
   const [feedbackNotice, setFeedbackNotice] = useState(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const feedbackTimerRef = useRef(null);
@@ -324,6 +333,14 @@ export default function App() {
       nowIso: currentNowIso
     });
   }, [baselineProfile, currentNowIso, dailyRecommendationInput, entries, loadSummary]);
+  const followUpInboxState = useMemo(() => {
+    return buildFollowUpInboxState({
+      tasks: followUpTasks,
+      entries,
+      templates,
+      nowIso: currentNowIso
+    });
+  }, [currentNowIso, entries, followUpTasks, templates]);
 
   const dailyLoadSeries = useMemo(() => {
     return buildDailyLoadSeries({
@@ -404,6 +421,9 @@ export default function App() {
     const todayKey = currentNowIso.slice(0, 10);
     return recommendationSnapshots.find((snapshot) => snapshot.dayKey === todayKey) || null;
   }, [currentNowIso, recommendationSnapshots]);
+  const selectedFollowUpItem = useMemo(() => {
+    return followUpInboxState.items.find((item) => item.taskId === selectedFollowUpTaskId) || null;
+  }, [followUpInboxState.items, selectedFollowUpTaskId]);
 
   function captureLayout(layoutKey, parentKey = null) {
     return (event) => {
@@ -483,6 +503,7 @@ export default function App() {
     appHistoryStore.setToleranceState(nextToleranceState);
 
     setEntries(nextSessionState.entries);
+    setFollowUpTasks(appHistoryStore.getFollowUpTasks());
     setToleranceState(nextToleranceState);
     setSelectedSessionId(nextSessionState.selectedSessionId);
   }
@@ -516,6 +537,13 @@ export default function App() {
       setSelectedSessionId(resolvedSelectedSessionId);
     }
   }, [resolvedSelectedSessionId, selectedSessionId]);
+
+  useEffect(() => {
+    if (selectedFollowUpTaskId && !selectedFollowUpItem) {
+      setSelectedFollowUpTaskId(null);
+      setFollowUpError("");
+    }
+  }, [selectedFollowUpItem, selectedFollowUpTaskId]);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -933,6 +961,7 @@ export default function App() {
     appHistoryStore.setToleranceState(updatedTolerance);
 
     setEntries(updatedEntries);
+    setFollowUpTasks(appHistoryStore.getFollowUpTasks());
     setToleranceState(updatedTolerance);
     setRecommendationSnapshots(appHistoryStore.getRecommendationSnapshots());
     setSelectedSessionId(nextEntry.id);
@@ -947,6 +976,75 @@ export default function App() {
     emitFeedback({
       type: "session_added",
       templateId
+    });
+  }
+
+  function handleOpenFollowUp(taskId) {
+    setSelectedFollowUpTaskId(taskId);
+    setFollowUpPainResponse("0");
+    setFollowUpFatigueResponse("0");
+    setFollowUpFunctionalImpact("same");
+    setFollowUpAppropriateness("about-right");
+    setFollowUpNote("");
+    setFollowUpError("");
+    setActiveView("home");
+
+    requestAnimationFrame(() => {
+      scrollToLayout("follow-up-inbox-card");
+    });
+  }
+
+  function handleSaveFollowUp() {
+    const pain = Number(followUpPainResponse);
+    const fatigue = Number(followUpFatigueResponse);
+    const invalidMessage =
+      !selectedFollowUpItem
+        ? "Pick a pending follow-up first."
+        : !Number.isFinite(pain) || pain < 0 || pain > 10
+          ? "Follow-up pain must be between 0 and 10."
+          : !Number.isFinite(fatigue) || fatigue < 0 || fatigue > 10
+            ? "Follow-up fatigue must be between 0 and 10."
+            : !followUpFunctionalImpact
+              ? "Choose how the session affected function."
+              : !followUpAppropriateness
+                ? "Choose whether the session felt appropriate."
+                : "";
+
+    if (invalidMessage) {
+      setFollowUpError(invalidMessage);
+      emitFeedback({
+        type: "session_validation_error",
+        message: invalidMessage
+      });
+      return;
+    }
+
+    appHistoryStore.completeFollowUpTask(
+      {
+        taskId: selectedFollowUpItem.taskId,
+        outcome: {
+          painResponse: pain,
+          fatigueResponse: fatigue,
+          functionalImpact: followUpFunctionalImpact,
+          appropriateness: followUpAppropriateness,
+          note: followUpNote
+        }
+      },
+      { nowIso: new Date().toISOString() }
+    );
+
+    setEntries(appHistoryStore.getEntries());
+    setFollowUpTasks(appHistoryStore.getFollowUpTasks());
+    setSelectedFollowUpTaskId(null);
+    setFollowUpError("");
+    setFollowUpPainResponse("0");
+    setFollowUpFatigueResponse("0");
+    setFollowUpFunctionalImpact("same");
+    setFollowUpAppropriateness("about-right");
+    setFollowUpNote("");
+    emitFeedback({
+      type: "session_added",
+      templateId: "follow-up"
     });
   }
 
@@ -1904,6 +2002,198 @@ export default function App() {
       ))}
     </View>
   ) : null;
+  const followUpInboxCard = (
+    <View
+      testID="card-follow-up-inbox"
+      style={[styles.card, styles.followUpInboxCard]}
+      onLayout={captureLayout("follow-up-inbox-card")}
+    >
+      <View style={styles.quickAddHeaderRow}>
+        <View>
+          <Text style={styles.sectionTitle}>Follow-Up Inbox</Text>
+          <Text style={styles.dailyCheckInSubtext}>
+            {followUpInboxState.totalCount > 0
+              ? `${followUpInboxState.overdueCount} overdue · ${followUpInboxState.pendingCount} upcoming`
+              : "Pending and overdue delayed-outcome check-ins show up here."}
+          </Text>
+        </View>
+      </View>
+
+      {followUpInboxState.totalCount === 0 ? (
+        <View testID="follow-up-inbox-empty" style={styles.followUpEmptyPanel}>
+          <Text style={styles.dailyPromptTitle}>{followUpInboxState.emptyTitle}</Text>
+          <Text style={styles.dailyPromptText}>{followUpInboxState.emptyBody}</Text>
+        </View>
+      ) : (
+        <View style={styles.followUpList}>
+          {followUpInboxState.items.map((item) => {
+            const isSelected = item.taskId === selectedFollowUpTaskId;
+            return (
+              <Pressable
+                key={item.taskId}
+                testID={`follow-up-task-${item.taskId}`}
+                onPress={() => handleOpenFollowUp(item.taskId)}
+                style={[
+                  styles.followUpListItem,
+                  item.status === "overdue" ? styles.followUpListItemOverdue : styles.followUpListItemPending,
+                  isSelected ? styles.followUpListItemSelected : null
+                ]}
+              >
+                <View style={styles.followUpListHeader}>
+                  <Text style={styles.followUpListTitle}>{item.title}</Text>
+                  <View
+                    style={[
+                      styles.followUpStatusBadge,
+                      item.status === "overdue" ? styles.followUpStatusBadgeOverdue : styles.followUpStatusBadgePending
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.followUpStatusBadgeText,
+                        item.status === "overdue"
+                          ? styles.followUpStatusBadgeTextOverdue
+                          : styles.followUpStatusBadgeTextPending
+                      ]}
+                    >
+                      {item.status}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.followUpListMeta}>{item.detailLabel}</Text>
+                {item.loggedAtLabel ? (
+                  <Text style={styles.followUpListMeta}>{item.loggedAtLabel}</Text>
+                ) : null}
+                <Text style={styles.followUpListTiming}>{item.timingLabel}</Text>
+                <Text style={styles.followUpListMeta}>{item.scheduledLabel}</Text>
+                <Text style={styles.followUpListAction}>{item.ctaLabel}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {selectedFollowUpItem ? (
+        <View testID="follow-up-editor" style={styles.dailyEditorCard}>
+          <Text style={styles.dailyEditorTitle}>Delayed outcome follow-up</Text>
+          <Text style={styles.followUpEditorMeta}>
+            {selectedFollowUpItem.title} · {selectedFollowUpItem.scheduledLabel}
+          </Text>
+
+          <View onLayout={captureLayout("field-followup-pain", "follow-up-inbox-card")}>
+            <Text style={styles.label}>Pain response (0-10)</Text>
+            <TextInput
+              testID="input-followup-pain"
+              value={followUpPainResponse}
+              onChangeText={setFollowUpPainResponse}
+              onFocus={() => handleInputFocus("field-followup-pain")}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+
+          <View onLayout={captureLayout("field-followup-fatigue", "follow-up-inbox-card")}>
+            <Text style={styles.label}>Fatigue response (0-10)</Text>
+            <TextInput
+              testID="input-followup-fatigue"
+              value={followUpFatigueResponse}
+              onChangeText={setFollowUpFatigueResponse}
+              onFocus={() => handleInputFocus("field-followup-fatigue")}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+
+          <Text style={styles.label}>Functional impact</Text>
+          <View style={styles.wrapRow}>
+            {["better", "same", "worse"].map((option) => (
+              <Pressable
+                key={option}
+                testID={`btn-followup-functional-impact-${option}`}
+                onPress={() => setFollowUpFunctionalImpact(option)}
+                style={[
+                  styles.pill,
+                  followUpFunctionalImpact === option ? styles.pillActive : styles.pillInactive
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    followUpFunctionalImpact === option ? styles.pillTextActive : styles.pillTextInactive
+                  ]}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>In hindsight, was the session appropriate?</Text>
+          <View style={styles.wrapRow}>
+            {["too-easy", "about-right", "too-much"].map((option) => (
+              <Pressable
+                key={option}
+                testID={`btn-followup-appropriateness-${option}`}
+                onPress={() => setFollowUpAppropriateness(option)}
+                style={[
+                  styles.pill,
+                  followUpAppropriateness === option ? styles.pillActive : styles.pillInactive
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    followUpAppropriateness === option ? styles.pillTextActive : styles.pillTextInactive
+                  ]}
+                >
+                  {formatOptionLabel(option)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View onLayout={captureLayout("field-followup-note", "follow-up-inbox-card")}>
+            <Text style={styles.label}>Optional note</Text>
+            <TextInput
+              testID="input-followup-note"
+              value={followUpNote}
+              onChangeText={setFollowUpNote}
+              onFocus={() => handleInputFocus("field-followup-note")}
+              multiline
+              style={[styles.input, styles.noteInput]}
+              placeholder="Anything worth remembering tomorrow?"
+              placeholderTextColor="#678475"
+            />
+          </View>
+
+          {followUpError ? (
+            <Text testID="follow-up-error-text" style={styles.errorText}>
+              {followUpError}
+            </Text>
+          ) : null}
+
+          <View style={styles.dailyEditorActionRow}>
+            <Pressable
+              testID="btn-save-follow-up"
+              onPress={handleSaveFollowUp}
+              style={styles.quickAddButton}
+            >
+              <Text style={styles.quickAddButtonText}>Save follow-up</Text>
+            </Pressable>
+            <Pressable
+              testID="btn-cancel-follow-up"
+              onPress={() => {
+                setSelectedFollowUpTaskId(null);
+                setFollowUpError("");
+              }}
+              style={styles.secondaryActionButton}
+            >
+              <Text style={styles.secondaryActionButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
   const screenVisibility = buildScreenVisibilityMap(activeView);
 
   return (
@@ -1957,6 +2247,7 @@ export default function App() {
         <HomeScreen
           isVisible={screenVisibility.home.isVisible}
           onboardingBaselineCard={onboardingBaselineCard}
+          followUpInboxCard={followUpInboxCard}
           dailyCheckInCard={dailyCheckInCard}
           recommendationCard={recommendationCard}
           recommendationHistoryCard={recommendationHistoryCard}
@@ -2030,6 +2321,88 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#cfe4d9",
     backgroundColor: "#f9fcfa"
+  },
+  followUpInboxCard: {
+    borderWidth: 1,
+    borderColor: "#cfe4d9",
+    backgroundColor: "#fcfdfb"
+  },
+  followUpEmptyPanel: {
+    backgroundColor: "#eff7f2",
+    borderRadius: 12,
+    padding: 14,
+    gap: 6
+  },
+  followUpList: { gap: 10 },
+  followUpListItem: {
+    borderRadius: 14,
+    padding: 14,
+    gap: 4
+  },
+  followUpListItemPending: {
+    backgroundColor: "#edf4f0"
+  },
+  followUpListItemOverdue: {
+    backgroundColor: "#fff2eb"
+  },
+  followUpListItemSelected: {
+    borderWidth: 1,
+    borderColor: "#0f6b47"
+  },
+  followUpListHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8
+  },
+  followUpListTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#173b2e",
+    flex: 1
+  },
+  followUpListMeta: {
+    fontSize: 12,
+    color: "#486b5b",
+    lineHeight: 17
+  },
+  followUpListTiming: {
+    fontSize: 13,
+    color: "#173b2e",
+    fontWeight: "700"
+  },
+  followUpListAction: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "#0f6b47",
+    fontWeight: "700"
+  },
+  followUpStatusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  followUpStatusBadgePending: {
+    backgroundColor: "#d7ebe1"
+  },
+  followUpStatusBadgeOverdue: {
+    backgroundColor: "#ffd9c9"
+  },
+  followUpStatusBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase"
+  },
+  followUpStatusBadgeTextPending: {
+    color: "#235240"
+  },
+  followUpStatusBadgeTextOverdue: {
+    color: "#9c3b16"
+  },
+  followUpEditorMeta: {
+    fontSize: 13,
+    color: "#486b5b",
+    lineHeight: 18
   },
   dailyCheckInSubtext: { fontSize: 13, color: "#3f6a58", marginTop: 4, maxWidth: 220 },
   dailyPromptPanel: {

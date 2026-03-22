@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 export function HomeScreen({
   isVisible,
   onboardingBaselineCard,
+  followUpInboxCard,
   dailyCheckInCard,
   recommendationCard,
   recommendationHistoryCard,
@@ -15,6 +16,7 @@ export function HomeScreen({
       pointerEvents={isVisible ? "auto" : "none"}
     >
       {onboardingBaselineCard}
+      {followUpInboxCard}
       {dailyCheckInCard}
       {recommendationCard}
       {recommendationHistoryCard}
